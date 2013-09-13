@@ -42,21 +42,33 @@ def main(coarse_val, orig_val, rcut):
                     state=data['coarse']['ass']['arr_0'][j][i]
                     if state!=-1:
                         if i not in unboundstates.keys():
-                            unboundstates[i]=state
-                            unboundstates[i]=data['coarse']['dist']['arr_0'][j][i]
-                        elif i in unboundstates.keys():
-                            if unboundstates[i]!=state:
-                                prev=unboundrmsd[i]
-                                if data['coarse']['dist']['arr_0'][j][i] < prev:
-                                    unboundstates[i]=state
-                                    unboundstates[i]=data['coarse']['dist']['arr_0'][j][i]
-                                else:
-                                    pass # keep previous assignment
+                            unboundstates[i]=[]
+                            unboundrmsd[i]=[]
+                        if state not in unboundstates[i]:
+                            unboundstates[i].append(state)
+                            unboundrmsd[i].append(data['coarse']['dist']['arr_0'][j][i])
                 else:
                     if i not in boundmap.keys():
                         boundmap[i]=i
-    import pdb
-    pdb.set_trace()
+    # unbound map needs unbound states as keys with bound states in lists
+    unboundmap=dict()
+    for unboundstate in unboundstates.values():
+        if len(unboundstate) > 1:
+            boundstate=[i for i in unboundstates.keys() if unboundstates[i]==unboundstate ]
+            boundstate=boundstate[0]
+            rmsd=numpy.array(unboundrmsd[boundstate])
+            frame=numpy.where(rmsd==min(rmsd))[0]
+            best=unboundstate[frame]
+            if best not in unboundmap.keys():
+                unboundmap[best]=[]
+            if boundstate not in unboundmap[best]:
+                unboundmap[best].append(boundstate)
+        else:
+            unboundstate=unboundstate[0]
+            if unboundstate not in unboundmap.keys():
+                unboundmap[unboundstate]=[]
+            if boundstate not in unboundmap[unboundstate]:
+                unboundmap[unboundstate].append(boundstate)
     # deal with micro states that are sent to different coarse states
     map=dict()
     bound=0
@@ -67,6 +79,8 @@ def main(coarse_val, orig_val, rcut):
     unbound=max(map.values())+1
     unbound_start=max(map.values())+1
     unboundtrack=dict()
+    import pdb
+    pdb.set_trace()
     for state in sorted(unboundmap.keys()):
         for i in unboundmap[state]:
             map[i]=unbound
