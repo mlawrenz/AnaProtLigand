@@ -33,6 +33,7 @@ def main(coarse_val, orig_val, rcut):
     unboundmap=dict()
     boundmap=dict()
     unboundstates=dict()
+    unboundrmsd=dict()
     # build map dict for orig to coarse unbound states, bound will stay same
     for j in range(0, data['orig']['ass']['arr_0'].shape[0]):
         for (n,i) in enumerate(data['orig']['ass']['arr_0'][j]):
@@ -42,12 +43,13 @@ def main(coarse_val, orig_val, rcut):
                     if state!=-1:
                         if i not in unboundstates.keys():
                             unboundstates[i]=state
+                            unboundstates[i]=data['coarse']['dist']['arr_0'][j][i]
                         elif i in unboundstates.keys():
                             if unboundstates[i]!=state:
-                                teststate=unboundstates[i] # test previous value is need replace
-                                testval=data['coarse']['dist']['arr_0'][j][i]
-                                if data['coarse']['dist']['arr_0'][state] < testval:
+                                prev=unboundrmsd[i]
+                                if data['coarse']['dist']['arr_0'][j][i] < prev:
                                     unboundstates[i]=state
+                                    unboundstates[i]=data['coarse']['dist']['arr_0'][j][i]
                                 else:
                                     pass # keep previous assignment
                 else:
