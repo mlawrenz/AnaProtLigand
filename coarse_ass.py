@@ -53,12 +53,12 @@ def main(coarse_val, orig_val, rcut):
         locations=numpy.where(newass==x)
         newass[locations]=count
         if x >= 10000:
-            unboundmap[count]=(x-1000)
+            unboundmap[count]=(x-10000)
         else:
             boundmap[count]=x
         count+=1
     io.saveh('%s/Coarsed_r%s_Assignments.h5' % (dirs['orig'], rcut), newass)
-    subdir='%s/Coarsed_r%s_PDBs/' % (dirs['orig'], rcut)
+    subdir='%s/Coarsed_r%s_gen/' % (dirs['orig'], rcut)
     if not os.path.exists(subdir):
         os.mkdir(subdir)
     ohandle=open('%s/Coarsed%s_r%s_Gens.rmsd.dat' % (subdir, coarse_val, rcut), 'w')
@@ -69,19 +69,18 @@ def main(coarse_val, orig_val, rcut):
     labels=['orig', 'coarse']
     total=len(boundmap.keys()) + len(unboundmap.keys())
     structure=proj.empty_traj()
-    structure['XYZList']=numpy.zeros((total, b, c), dtype=numpy.float32)
+    structure['XYZList']=numpy.zeros((total, b, c), dtype='float32')
     count=0
-    import pdb
-    pdb.set_trace()
     for (name, label, mapdata) in zip( names, labels, dicts):
         print "writing coarse gen %s out of %s pdbs" % (count, len(mapdata.keys()))
         for i in sorted(mapdata.keys()):
             macro=mapdata[i]
             structure['XYZList'][count]=data[label]['gens']['XYZList'][macro]
             ohandle.write('%s\t%s\t%s\n' % (name, count, data[label]['rmsd'][macro]))
+            print name, count
             count+=1
     structure.save_to_xtc('%s/Coarsed%s_r%s_Gens.xtc' % (subdir, coarse_val, rcut))
-    return data
+    #return data
 
 def parse_commandline():
     parser = optparse.OptionParser()
