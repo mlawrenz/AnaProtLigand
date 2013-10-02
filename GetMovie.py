@@ -4,7 +4,7 @@ import glob
 import random
 from scipy.io import *
 from msmbuilder import Conformation
-from msmbuilder import MSMLib
+from msmbuilder import MSMLib, msm_analysis
 import optparse
 import numpy
 import os
@@ -20,61 +20,42 @@ def map_size(x):
         size=200
     elif abs(x-0.5) < 0.3 and abs(x-0.5) > 0.2:
         size=100
-    elif x==0:
-        size=10
-    elif x==1:
-        size=10
     else:
         size=50
     return size
 
 def main(dir, coarse , lag, type):
     data=dict()
-    rmsd=numpy.loadtxt('%s/Coarsed_r10_gen/Coarsed%s_r10_Gens.rmsd.dat' % (dir, coarse))
-    data['rmsd']=numpy.loadtxt('%s/Coarsed_r10_gen/Coarsed%s_r10_Gens.selfrmsd.dat' % (dir, coarse))
+    data['selfrmsd']=numpy.loadtxt('%s/Coarsed_r10_gen/Coarsed%s_r10_Gens.selfrmsd.dat' % (dir, coarse))
+    #data['selfhelix']=numpy.loadtxt('%s/Coarsed_r10_gen/Coarsed%s_r10_Gens.selfhelixrmsd.dat' % (dir, coarse))
+    #data['helix']=numpy.loadtxt('%s/Coarsed_r10_gen/Coarsed%s_r10_Gens.helixrmsd.dat' % (dir, coarse))
+    #data['rmsd']=numpy.loadtxt('%s/Coarsed_r10_gen/Coarsed%s_r10_Gens.rmsd.dat' % (dir, coarse))
     com=numpy.loadtxt('%s/Coarsed_r10_gen/Coarsed%s_r10_Gens.vmd_com.dat' % (dir, coarse), usecols=(1,))
     com=[i/com[0] for i in com]
     data['com']=com[1:]
     modeldir='%s/msml%s_coarse_r10_d%s/' % (dir, lag, coarse)
-    ass=io.loadh('%s/Assignments.Fixed.h5' % modeldir)
     pops=numpy.loadtxt('%s/Populations.dat' % modeldir)
     map=numpy.loadtxt('%s/Mapping.dat' % modeldir)
-
-    map_rmsd=[]
-    map_com=[]
-    for x in range(0, len(data['rmsd'])):
-        if map[x]!=-1:
-            map_com.append(data['com'][x])
-            map_rmsd.append(data['rmsd'][x])
-    
-    project = Project.load_from('ProjectInfo.yaml')
-    map_com=numpy.array(map_com)
-    map_rmsd=numpy.array(map_rmsd)
-    T=mmread('%s/tProb.mtx' % modeldir)
     unbound=numpy.loadtxt('%s/tpt-%s/unbound_%s_states.txt' % (modeldir, type, type), dtype=int)
     bound=numpy.loadtxt('%s/tpt-%s/bound_%s_states.txt' % (modeldir, type, type), dtype=int)
 
-    Tdense=T.todense()
-    data=dict()
-    for i in unbound:
-        for j in unbound:
-            if Tdense[i,j]!=0:
-                if i not in data.keys():
-                    data[i]=[]
-                data[i].append(j)
-    print data
-    cm=pylab.cm.get_cmap('RdYlBu_r') #blue will be negative components, red positive
-    Q=tpt.calculate_committors(unbound, bound, T)
-    ohandle=open('%s/commitor_states.txt' % modeldir, 'w')
-    for i in range(0,len(Q)):
-        if Q[i]>0.40 and Q[i]<0.6:
-            ohandle.write('%s\n' % i)
-            #t=project.get_random_confs_from_states(ass['arr_0'], [int(i),], 20)
-            #t[0].save_to_xtc('%s/commottor_state%s.xtc' % (modeldir, i))
-    pylab.scatter(map_com, map_rmsd, c=Q, cmap=cm, alpha=0.7, s=[map_size(i) for i in Q])
-    pylab.colorbar()
-    pylab.show()
+    project = Project.load_from('ProjectInfo.yaml')
+    ass=io.loadh('%s/Assignments.Fixed.h5' % modeldir)
+    T=mmread('%s/tProb.mtx' % modeldir)
+    paths=io.loadh('%s/tpt-%s/Paths.h5' % (modeldir, type))
 
+    steps=10000
+    for startstate in unbound:
+        print "on start state %s" % startstate
+        movie=project.empty_traj()
+        traj=msm_analysis.sample(T, int(startstate),int(steps))
+        for (n, state) in enumerate(traj):
+            t=project.get_random_confs_from_states(ass['arr_0'], [int(state),], 20)
+            if n==0:
+                movie['XYZList']=t[0]['XYZList']
+            else:
+                movie['XYZList']=numpy.vstack((movie['XYZList'], t[0]['XYZList']))
+        movie.save_to_xtc('%s/tpt-%s/movie_state%s_100microsec.xtc' % (modeldir, type, startstate))
 
 def parse_commandline():
     parser = optparse.OptionParser()
@@ -93,3 +74,4 @@ def parse_commandline():
 if __name__ == "__main__":
     (options, args) = parse_commandline()
     main(dir=options.dir, coarse=options.coarse, lag=options.lag, type=options.type)
+

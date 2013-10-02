@@ -26,8 +26,10 @@ def map_size(x):
 
 def main(dir, coarse , lag, type):
     data=dict()
-    rmsd=numpy.loadtxt('%s/Coarsed_r10_gen/Coarsed%s_r10_Gens.rmsd.dat' % (dir, coarse), usecols=(2,))
-    data['rmsd']=numpy.loadtxt('%s/Coarsed_r10_gen/Coarsed%s_r10_Gens.selfrmsd.dat' % (dir, coarse))
+    data['selfrmsd']=numpy.loadtxt('%s/Coarsed_r10_gen/Coarsed%s_r10_Gens.selfrmsd.dat' % (dir, coarse))
+    #data['selfhelix']=numpy.loadtxt('%s/Coarsed_r10_gen/Coarsed%s_r10_Gens.selfhelixrmsd.dat' % (dir, coarse))
+    #data['helix']=numpy.loadtxt('%s/Coarsed_r10_gen/Coarsed%s_r10_Gens.helixrmsd.dat' % (dir, coarse))
+    #data['rmsd']=numpy.loadtxt('%s/Coarsed_r10_gen/Coarsed%s_r10_Gens.rmsd.dat' % (dir, coarse))
     com=numpy.loadtxt('%s/Coarsed_r10_gen/Coarsed%s_r10_Gens.vmd_com.dat' % (dir, coarse), usecols=(1,))
     com=[i/com[0] for i in com]
     data['com']=com[1:]
@@ -37,30 +39,47 @@ def main(dir, coarse , lag, type):
     unbound=numpy.loadtxt('%s/tpt-%s/unbound_%s_states.txt' % (modeldir, type, type), dtype=int)
     bound=numpy.loadtxt('%s/tpt-%s/bound_%s_states.txt' % (modeldir, type, type), dtype=int)
 
-
-    map_com=[]
-    map_rmsd=[]
     paths=io.loadh('%s/tpt-%s/Paths.h5' % (modeldir, type))
-    for x in range(0, len(data['rmsd'])):
-        if map[x]!=-1:
-            map_com.append(data['com'][x])
-            map_rmsd.append(data['rmsd'][x])
-    
-    map_com=numpy.array(map_com)
-    map_rmsd=numpy.array(map_rmsd)
+
+    committors=numpy.loadtxt('%s/commitor_states.txt' % modeldir, dtype=int)
+    print committors
     colors=['red', 'orange', 'green', 'cyan', 'blue', 'purple']
-    for p in range(0, 6):
-        path=paths['Paths'][p]
-        flux=paths['fluxes'][p]/paths['fluxes'][0]
-        print "flux %s" % flux
-        frames=numpy.where(path!=-1)[0]
-        path=numpy.array(path[frames], dtype=int)
-        size=(paths['fluxes'][p]/paths['fluxes'][0])*100
-        pylab.figure()
-        pylab.scatter(map_com[path], map_rmsd[path], c=colors[p], alpha=0.7, s=size)
-        pylab.title('%s of max flux' % (paths['fluxes'][p]/paths['fluxes'][0]))
-        pylab.xlim(0,4)
-        pylab.ylim(0,10)
+    colors=colors*40
+    for op in data.keys():
+        if op=='com':
+            continue
+        map_com=[]
+        map_rmsd=[]
+        for x in range(0, len(data[op])):
+            if map[x]!=-1:
+                map_com.append(data['com'][x])
+                map_rmsd.append(data[op][x])
+        map_com=numpy.array(map_com)
+        map_rmsd=numpy.array(map_rmsd)
+        for p in range(0, 20):
+            pylab.figure()
+            path=paths['Paths'][p]
+            print "Bottleneck", paths['Bottlenecks'][p]
+            flux=paths['fluxes'][p]/paths['fluxes'][0]
+            if flux < 0.2:
+                break
+            print "flux %s" % flux
+            frames=numpy.where(path!=-1)[0]
+            path=numpy.array(path[frames], dtype=int)
+            size=(paths['fluxes'][p]/paths['fluxes'][0])*1000
+            for j in paths['Bottlenecks'][p]:
+                pylab.scatter(map_com[j], map_rmsd[j], marker='x', c=colors[p], alpha=0.7, s=size*2)
+                location=numpy.where(committors==j)[0]
+                if location.size:
+                    print "path %s state %s bottleneck in committors" % (p, j)
+                    print map_com[j], map_rmsd[j]
+            pylab.scatter(map_com[path], map_rmsd[path], c=colors[p], alpha=0.7, s=size)
+            pylab.hold(True)
+            pylab.title('P-L COM vs. L %s' % op)
+            pylab.xlabel('PL-COM')
+            pylab.ylabel(op)
+            pylab.xlim(0,4)
+            pylab.ylim(0,max(map_rmsd+5))
     pylab.show()
 
 def parse_commandline():

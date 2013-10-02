@@ -25,7 +25,7 @@ def main(input, sys, k, pnorm=False):
         ydata=[]
         for key in sorted(data.keys()):
             ydata.append(data[key][count])
-        pylab.scatter(sorted(data.keys()), [numpy.log10(i*10/1000.0) for i in ydata], c=color, edgecolor=color, marker='o')
+        pylab.scatter([i*10/1000.0 for i in sorted(data.keys())], [numpy.log10(i*10/1000.0) for i in ydata], c=color, edgecolor=color, marker='o')
         pylab.hold(True)
 
     xlabel=pylab.xlabel('Lag Time $\\tau$ (ns)',size='large')
@@ -38,7 +38,7 @@ def main(input, sys, k, pnorm=False):
     #pylab.xlim(-5,1020)
     #lg=pylab.legend(loc=9)
     #lg.get_frame().set_linewidth(0)
-    pylab.title('%s %s State MSM' % (sys, k) )
+    #pylab.title('%s %s State MSM' % (sys, k) )
     if pnorm==True:
         pylab.savefig('%s_Data_HybridPnorm_%s_Implied.png' % ( sys, k), dpi=300)
     else:

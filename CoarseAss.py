@@ -75,14 +75,12 @@ def main(coarse_val, orig_val, rcut):
     newass, boundmap, count=remap_ass(newass, newass, unique, count)
     unique=sorted(set(unboundass.flatten()))
     newass, unboundmap, count=remap_ass(unboundass, newass, unique, count)
-    import pdb
-    pdb.set_trace()
-    io.saveh('%s/Coarsed_r%s_d%s_Assignments_test.h5' % (dirs['orig'], rcut, coarse_val), newass)
-    io.saveh('%s/Coarsed_r%s_d%s_Assignments_test.distances.h5' % (dirs['orig'], rcut, coarse_val), newdist)
+    io.saveh('%s/Coarsed_r%s_d%s_Assignments.h5' % (dirs['orig'], rcut, coarse_val), newass)
+    io.saveh('%s/Coarsed_r%s_d%s_Assignments.distances.h5' % (dirs['orig'], rcut, coarse_val), newdist)
     subdir='%s/Coarsed_r%s_gen/' % (dirs['orig'], rcut)
     if not os.path.exists(subdir):
         os.mkdir(subdir)
-    ohandle=open('%s/Coarsed%s_r%s_Gens_test.rmsd.dat' % (subdir, coarse_val, rcut), 'w')
+    ohandle=open('%s/Coarsed%s_r%s_Gens.rmsd.dat' % (subdir, coarse_val, rcut), 'w')
     b=data['orig']['gens']['XYZList'].shape[1]
     c=data['orig']['gens']['XYZList'].shape[2]
     dicts=[boundmap, unboundmap]
@@ -100,10 +98,10 @@ def main(coarse_val, orig_val, rcut):
             ohandle.write('%s\t%s\t%s\n' % (name, count, data[label]['rmsd'][macro]))
             print name, count
             count+=1
-    otraj='%s/Coarsed%s_r%s_Gens_test.xtc' % (subdir, coarse_val, rcut)
+    otraj='%s/Coarsed%s_r%s_Gens.xtc' % (subdir, coarse_val, rcut)
     if os.path.exists(otraj):
         os.remove(otraj)
-    structure.save_to_xtc('%s/Coarsed%s_r%s_Gens_test.xtc' % (subdir, coarse_val, rcut))
+    structure.save_to_xtc('%s/Coarsed%s_r%s_Gens.xtc' % (subdir, coarse_val, rcut))
     #return data
 
 def parse_commandline():
