@@ -1,0 +1,22 @@
+# get rmsd from reference, run tcl to get ligand and protein coors and
+# get min distance from prot-ligand (unbound are those where do not touch
+# protein
+
+./rmsd_gens.sh d6/Coarsed_r10_gen/Coarsed20_r10_Gens.xtc
+vmd -dispdev text -e Coarse_r10_d20.tcl
+run-tcl.sh Coarsed20_r10_Gens d6/Coarsed_r10_gen/
+
+python state_protein_ligand_dist.py -p d6/Coarsed_r10_gen/Coarsed20_r10_Gens.vmd_protcoords.pickle -l d6/Coarsed_r10_gen/Coarsed20_r10_Gens.vmd_ligcoords.pickle -n 20
+
+# working with model (specifiy lag time)
+python CheckGens.py 
+python GetBoundUnbound.py -d d6 -c 20 -l 500
+
+python GetCommitors.py -d d6 -c 20 -l 500 -t strict
+
+FindPaths.py -n 10 -t d6/msml500_coarse_r10_d20/tProb.mtx -s d6/msml500_coarse_r10_d20/tpt-strict/unbound_strict_states.txt -e d6/msml500_coarse_r10_d20/tpt-strict/bound_strict_states.txt -o d6/msml500_coarse_r10_d20/tpt-strict/Paths.h5
+
+python GetPaths.py -d d6/ -c 20 -l 500 -t strict
+
+python CheckEigs.py -d d6 -c 20 -l 1000 -t touch
+
