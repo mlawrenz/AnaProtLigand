@@ -8,13 +8,13 @@ import os
 from numpy import linalg
 
 
-def main(modeldir, write=False):
+def main(modeldir, gensfile, write=False):
     proj=Project.load_from('%s/ProjectInfo.yaml' % modeldir.split('Data')[0])
     ass=io.loadh('%s/Assignments.Fixed.h5' % modeldir)
     data=dict()
     data['dist']=numpy.loadtxt('%s/prot_lig_distance.dat' % modeldir, usecols=(1,))
-    data['rmsd']=numpy.loadtxt('%s/Gens.rmsd.dat' % modeldir, usecols=(2,))
-    com=numpy.loadtxt('%s/Gens.vmd_com.dat' % modeldir, usecols=(1,))
+    data['rmsd']=numpy.loadtxt('%s.rmsd.dat' % gensfile.split('.lh5')[0], usecols=(2,))
+    com=numpy.loadtxt('%s/Gens.vmd_com.dat' % gensfile.split('.lh5')[0], usecols=(1,))
     data['com']=com[1:]
     pops=numpy.loadtxt('%s/Populations.dat' % modeldir)
     map=numpy.loadtxt('%s/Mapping.dat' % modeldir)
@@ -67,6 +67,8 @@ def parse_commandline():
     parser = optparse.OptionParser()
     parser.add_option('-d', '--dir', dest='dir',
                       help='directory')
+    parser.add_option('-g', '--gensfile', dest='gensfile',
+                          help='gens files')
     parser.add_option('-w', action="store_true", dest="write")
     (options, args) = parser.parse_args()
     return (options, args)
@@ -75,7 +77,7 @@ def parse_commandline():
 if __name__ == "__main__":
     (options, args) = parse_commandline()
     if options.write==True:
-        main(modeldir=options.dir,  write=True)
+        main(modeldir=options.dir, gensfile=options.gensfile,  write=True)
     else:
-        main(modeldir=options.dir,  write=False)
+        main(modeldir=options.dir,gensfile=options.gensfile)
 

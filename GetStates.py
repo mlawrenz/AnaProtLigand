@@ -11,14 +11,11 @@ import os
 from numpy import linalg
 import pylab
 
-def main(dir, coarse , lag, type):
+def main(modeldir):
     data=dict()
-    modeldir='%s/msml%s_coarse_r10_d%s/' % (dir, lag, coarse)
-
-    project = Project.load_from('ProjectInfo.yaml')
+    project=Project.load_from('%s/ProjectInfo.yaml' % modeldir.split('Data')[0])
     ass=io.loadh('%s/Assignments.Fixed.h5' % modeldir)
     T=mmread('%s/tProb.mtx' % modeldir)
-    paths=io.loadh('%s/tpt-%s/Paths.h5' % (modeldir, type))
 
     if not os.path.exists('%s/adaptive-states/' % modeldir):
         os.mkdir('%s/adaptive-states/' % modeldir)
@@ -35,12 +32,8 @@ def main(dir, coarse , lag, type):
 
 def parse_commandline():
     parser = optparse.OptionParser()
-    parser.add_option('-d', '--dir', dest='dir',
-                      help='directory')
-    parser.add_option('-c', '--coarse', dest='coarse',
-                      help='coarse grain cutoff')
-    parser.add_option('-l', '--lag', dest='lag',
-                      help='lag time')
+    parser.add_option('-d', '--modeldir', dest='modeldir',
+                      help='model directory')
     parser.add_option('-t', '--type', dest='type',
                       help='type')
     (options, args) = parser.parse_args()
@@ -49,5 +42,5 @@ def parse_commandline():
 #run the function main if namespace is main
 if __name__ == "__main__":
     (options, args) = parse_commandline()
-    main(dir=options.dir, coarse=options.coarse, lag=options.lag, type=options.type)
+    main(modeldir=options.modeldir, type=options.type)
 

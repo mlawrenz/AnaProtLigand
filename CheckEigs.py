@@ -28,27 +28,41 @@ def map_size(x):
         size=50
     return size
 
-def main(dir, coarse , lag, type):
+def get_structure(modeldir, eig, gen_states, states, gens, project, ass, type=None):
+    # for assignments, take mapped states
+    # for gens, take gen states
+    for (state, gstate) in zip(states, gen_states):
+        sample=project.empty_traj()
+        (a, b, c) =gens['XYZList'].shape
+        sample['XYZList']=numpy.zeros((1, b, c), dtype=numpy.float32)
+        sample['XYZList'][0]=gens['XYZList'][gstate]
+        sample.save_to_pdb('%s/eig-states/eig%s-%s-state%s-centroid.pdb' % (modeldir, eig, type, int(state)))
+        t=project.get_random_confs_from_states(ass['arr_0'], [int(state),], 5)
+        for j in range(0, 5):
+            sample=project.empty_traj()
+            (a, b, c) =gens['XYZList'].shape
+            sample['XYZList']=numpy.zeros((1, b, c), dtype=numpy.float32)
+            sample['XYZList'][0]=t[0]['XYZList'][j]
+            sample.save_to_pdb('%s/eig-states/eig%s-%s-state%s-%s.pdb' % (modeldir, eig, type, int(state), j))
+
+
+
+def main(modeldir, gensfile, write=False):
+    if not os.path.exists('%s/eig-states/' % modeldir):
+        os.mkdir('%s/eig-states/' % modeldir)
+    ohandle=open('%s/eig-states/eiginfo.txt' % modeldir, 'w')
+    project=Project.load_from('%s/ProjectInfo.yaml' % modeldir.split('Data')[0])
+    ass=io.loadh('%s/Assignments.Fixed.h5' % modeldir)
+
+    gens=Trajectory.load_from_lhdf(gensfile)
+    T=mmread('%s/tProb.mtx' % modeldir)
     data=dict()
-    data['rmsd']=numpy.loadtxt('%s/Coarsed_r10_gen/Coarsed%s_r10_Gens.selfrmsd.dat' % (dir, coarse))
-    #data['rmsd']=numpy.loadtxt('%s/Coarsed_r10_gen/Coarsed%s_r10_Gens.rmsd.dat' % (dir, coarse))
-    #data['rmsd']=numpy.loadtxt('%s/Coarsed_r10_gen/Coarsed%s_r10_Gens.helixrmsd.dat' % (dir, coarse))
-    com=numpy.loadtxt('%s/Coarsed_r10_gen/Coarsed%s_r10_Gens.vmd_com.dat' % (dir, coarse), usecols=(1,))
-    #com=[i/com[0] for i in com]
+    data['rmsd']=numpy.loadtxt('%s.rmsd.dat' % gensfile.split('.lh5')[0])
+    com=numpy.loadtxt('%s.vmd_com.dat' % gensfile.split('.lh5')[0], usecols=(1,))
     data['com']=com[1:]
-    modeldir='%s/msml%s_coarse_r10_d%s/' % (dir, lag, coarse)
     pops=numpy.loadtxt('%s/Populations.dat' % modeldir)
     map=numpy.loadtxt('%s/Mapping.dat' % modeldir)
 
-    reference=dict()
-    ref_coms=numpy.loadtxt('/home/mlawrenz/p53/s100b_md/msm_80ns_p53CA/5A_cutoff/vmd_com.dat', usecols=(1,))
-    ref_rmsd=numpy.loadtxt('/home/mlawrenz/p53/s100b_md/msm_80ns_p53CA/5A_cutoff/trajrmsd.dat', usecols=(1,))
-    reference['rmsd']=[]
-    reference['com']=[]
-    for conf in range(1,10):
-        n=conf-1
-        reference['rmsd'].append(float(ref_rmsd[n]))
-        reference['com'].append(float(ref_coms[n]))
     map_rmsd=[]
     map_com=[]
     for x in range(0, len(data['rmsd'])):
@@ -61,74 +75,79 @@ def main(dir, coarse , lag, type):
     T=mmread('%s/tProb.mtx' % modeldir)
     eigs_m=msm_analysis.get_eigenvectors(T, 10)
 
-    order=numpy.argsort(map_rmsd)
-    ordercom=numpy.argsort(map_com)
-
     cm=pylab.cm.get_cmap('RdYlBu_r') #blue will be negative components, red positive
 
     print numpy.shape(eigs_m[1][:,1])
-    for i in range(0,6):
+    for i in range(0,3):
+        order=numpy.argsort(eigs_m[1][:,i])
         if i==0:
-            order=numpy.argsort(eigs_m[1][:,i])
             maxes=[]
+            gen_maxes=[]
             values=[]
+            ohandle.write('eig%s maxes\n' % i)
+            ohandle.write('state\tgenstate\tmagnitude\trmsd\tcom\n')
             for n in order[::-1][:5]:
-                maxes.append(numpy.where(map==n)[0])
+                gen_maxes.append(numpy.where(map==n)[0])
+                maxes.append(n)
                 values.append(eigs_m[1][n,i])
+                ohandle.write('%s\t%s\t%s\t%s\t%s\n' % (n, numpy.where(map==n)[0], eigs_m[1][n,i], map_rmsd[n], map_com[n]))
             print "maxes at ",  maxes, values
+            maxes=numpy.array(maxes)
+            if write==True:
+                get_structure(modeldir, i, gen_maxes, maxes, gens, project, ass, type='max')
         else:
-            order=numpy.argsort(eigs_m[1][:,i])
             maxes=[]
+            gen_maxes=[]
             values=[]
+            ohandle.write('eig%s maxes\n' % i)
             for n in order[::-1][:5]:
-                maxes.append(numpy.where(map==n)[0])
+                gen_maxes.append(numpy.where(map==n)[0])
+                maxes.append(n)
                 values.append(eigs_m[1][n,i])
+                ohandle.write('%s\t%s\t%s\t%s\t%s\n' % (n, numpy.where(map==n)[0], eigs_m[1][n,i], map_rmsd[n], map_com[n]))
             print "maxes at ",  maxes, values
             order=numpy.argsort(eigs_m[1][:,i])
             mins=[]
+            gen_mins=[]
             values=[]
+            ohandle.write('eig%s mins\n' % i)
             for n in order[:5]:
-                mins.append(numpy.where(map==n)[0])
+                gen_mins.append(numpy.where(map==n)[0])
+                mins.append(n)
                 values.append(eigs_m[1][n,i])
+                ohandle.write('%s\t%s\t%s\t%s\t%s\n' % (n, numpy.where(map==n)[0], eigs_m[1][n,i], map_rmsd[n], map_com[n]))
             print "mins at ",  mins, values
-        pylab.scatter(map_com[ordercom], map_rmsd[ordercom], c=eigs_m[1][ordercom,i], cmap=cm, s=1000*abs(eigs_m[1][ordercom,i]), alpha=0.5)
-        print map_com[ordercom][numpy.argmax(eigs_m[1][ordercom,i])]
-        print eigs_m[1][ordercom,i][1]
-#       pylab.scatter(map_rmsd[order], statehelix[order]*100., c=eigs_m[1][:,i], cmap=cm, s=50, alpha=0.7)
-        rdivide=max(reference['rmsd'])/10.0
-        cdivide=max(reference['com'])/10.0
-        pylab.plot([max(reference['com'])]*11, numpy.arange(0, max(reference['rmsd'])+rdivide/2.0, rdivide), 'r--', label='NMR Bound Ensemble')
-        pylab.plot(numpy.arange(0, max(reference['com'])+cdivide, cdivide), [max(reference['rmsd'])]*11, 'r--')
-        pylab.subplots_adjust(left = 0.1, right = 1.02, bottom = 0.10, top = 0.85, wspace = 0, hspace = 0)
+            if write==True:
+                get_structure(modeldir, i, gen_maxes,  maxes, gens, project, ass, type='max')
+                get_structure(modeldir, i, gen_mins,  mins, gens, project, ass, type='min')
+        pylab.scatter(map_com[order], map_rmsd[order], c=eigs_m[1][order,i], cmap=cm, s=1000*abs(eigs_m[1][order,i]), alpha=0.5)
+        print map_com[order][numpy.argmax(eigs_m[1][order,i])]
+        print eigs_m[1][order,i][1]
         CB=pylab.colorbar()
         l,b,w,h=pylab.gca().get_position().bounds
         ll, bb, ww, hh=CB.ax.get_position().bounds
         CB.ax.set_position([ll, b+0.1*h, ww, h*0.8])
         CB.set_label('Eig%s Magnitudes' % i)
-        ylabel=pylab.ylabel('p53 RMSD to Bound Conformation ($\AA$)')
-        xlabel=pylab.xlabel(r'p53 to S100$\beta$$\beta$ Active Site COM Distance ($\AA$)')
-        #pylab.ylim(0, 12)
-        #pylab.xlim(0,60)
-        #pylab.title('Folding and Binding \n Colored by Magnitudes of Slowest Eigenvector Components')
+        ylabel=pylab.ylabel('Ligand RMSD to Xtal ($\AA$)')
+        xlabel=pylab.xlabel(r'P Active Site - L COM Distance ($\AA$)')
         pylab.legend(loc=8, frameon=False)
         pylab.savefig('%s/2deigs%i_com_prmsd.png' %(modeldir, i),dpi=300)
-        pylab.show()
-        #pylab.clf()
+        #pylab.show()
 
 def parse_commandline():
     parser = optparse.OptionParser()
-    parser.add_option('-d', '--dir', dest='dir',
-                      help='directory')
-    parser.add_option('-c', '--coarse', dest='coarse',
-                      help='coarse grain cutoff')
-    parser.add_option('-l', '--lag', dest='lag',
-                      help='lag time')
-    parser.add_option('-t', '--type', dest='type',
-                      help='type')
+    parser.add_option('-d', '--modeldir', dest='modeldir',
+                      help='msm directory')
+    parser.add_option('-g', '--gensfile', dest='gensfile',
+                      help='gens files')
+    parser.add_option('-w', action="store_true", dest="write")
     (options, args) = parser.parse_args()
     return (options, args)
 
 #run the function main if namespace is main
 if __name__ == "__main__":
     (options, args) = parse_commandline()
-    main(dir=options.dir, coarse=options.coarse, lag=options.lag, type=options.type)
+    if options.write==True:
+        main(modeldir=options.modeldir, gensfile=options.gensfile, write=True)
+    else:
+        main(modeldir=options.modeldir, gensfile=options.gensfile)

@@ -28,14 +28,18 @@ def map_size(x):
         size=50
     return size
 
-def main(dir, coarse , lag, type):
+def main(modeldir,type):
+    proj=Project.load_from('%s/ProjectInfo.yaml' % modeldir.split('Data')[0])
     data=dict()
-    rmsd=numpy.loadtxt('%s/Coarsed_r10_gen/Coarsed%s_r10_Gens.rmsd.dat' % (dir, coarse))
-    data['rmsd']=numpy.loadtxt('%s/Coarsed_r10_gen/Coarsed%s_r10_Gens.selfrmsd.dat' % (dir, coarse))
-    com=numpy.loadtxt('%s/Coarsed_r10_gen/Coarsed%s_r10_Gens.vmd_com.dat' % (dir, coarse), usecols=(1,))
-    com=[i/com[0] for i in com]
+    data['rmsd']=numpy.loadtxt('%s/Gens.rmsd.dat' % modeldir, usecols=(2,))
+    com=numpy.loadtxt('%s/Gens.vmd_com.dat' % modeldir, usecols=(1,))
+    refcom=com[0]
     data['com']=com[1:]
-    modeldir='%s/msml%s_coarse_r10_d%s/' % (dir, lag, coarse)
+    data['com']=numpy.array(data['com'])
+    pops=numpy.loadtxt('%s/Populations.dat' % modeldir)
+    map=numpy.loadtxt('%s/Mapping.dat' % modeldir)
+    frames=numpy.where(map!=-1)[0]
+
     ass=io.loadh('%s/Assignments.Fixed.h5' % modeldir)
     pops=numpy.loadtxt('%s/Populations.dat' % modeldir)
     map=numpy.loadtxt('%s/Mapping.dat' % modeldir)
@@ -47,7 +51,6 @@ def main(dir, coarse , lag, type):
             map_com.append(data['com'][x])
             map_rmsd.append(data['rmsd'][x])
     
-    project = Project.load_from('ProjectInfo.yaml')
     map_com=numpy.array(map_com)
     map_rmsd=numpy.array(map_rmsd)
     T=mmread('%s/tProb.mtx' % modeldir)
@@ -80,10 +83,6 @@ def parse_commandline():
     parser = optparse.OptionParser()
     parser.add_option('-d', '--dir', dest='dir',
                       help='directory')
-    parser.add_option('-c', '--coarse', dest='coarse',
-                      help='coarse grain cutoff')
-    parser.add_option('-l', '--lag', dest='lag',
-                      help='lag time')
     parser.add_option('-t', '--type', dest='type',
                       help='type')
     (options, args) = parser.parse_args()
@@ -92,4 +91,4 @@ def parse_commandline():
 #run the function main if namespace is main
 if __name__ == "__main__":
     (options, args) = parse_commandline()
-    main(dir=options.dir, coarse=options.coarse, lag=options.lag, type=options.type)
+    main(modeldir=options.dir,  type=options.type)

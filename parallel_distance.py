@@ -22,10 +22,12 @@ def parallel_distance(nproc, ligcoors, protcoors, ofile, completed=None):
     ligand_coor_chunks=[]
     protein_coor_chunks=[]
     need_states=[]
+    targets=[x for x in range(0, maxstates) if x not in completed.keys()]
     if maxstates % nproc != 0:
         remain=maxstates % nproc
-    targets=[x for x in range(0, maxstates) if x not in completed.keys()]
-    remain=targets[::-1][:remain]
+        remain=targets[::-1][:remain]
+    else:
+        remain=[-100,]
     r=False
     for state in [x for x in range(0, maxstates) if x not in completed.keys()]:
         if state not in completed.keys():

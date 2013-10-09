@@ -24,16 +24,17 @@ def map_size(x):
         size=50
     return size
 
-def main(dir, coarse , lag, type):
+def main(modeldir,  type):
     data=dict()
-    data['selfrmsd']=numpy.loadtxt('%s/Coarsed_r10_gen/Coarsed%s_r10_Gens.selfrmsd.dat' % (dir, coarse))
-    #data['selfhelix']=numpy.loadtxt('%s/Coarsed_r10_gen/Coarsed%s_r10_Gens.selfhelixrmsd.dat' % (dir, coarse))
-    #data['helix']=numpy.loadtxt('%s/Coarsed_r10_gen/Coarsed%s_r10_Gens.helixrmsd.dat' % (dir, coarse))
-    #data['rmsd']=numpy.loadtxt('%s/Coarsed_r10_gen/Coarsed%s_r10_Gens.rmsd.dat' % (dir, coarse))
-    com=numpy.loadtxt('%s/Coarsed_r10_gen/Coarsed%s_r10_Gens.vmd_com.dat' % (dir, coarse), usecols=(1,))
-    com=[i/com[0] for i in com]
+    data['rmsd']=numpy.loadtxt('%s/Gens.rmsd.dat' % modeldir, usecols=(2,))
+    com=numpy.loadtxt('%s/Gens.vmd_com.dat' % modeldir, usecols=(1,))
+    refcom=com[0]
     data['com']=com[1:]
-    modeldir='%s/msml%s_coarse_r10_d%s/' % (dir, lag, coarse)
+    data['com']=numpy.array(data['com'])
+    pops=numpy.loadtxt('%s/Populations.dat' % modeldir)
+    map=numpy.loadtxt('%s/Mapping.dat' % modeldir)
+    frames=numpy.where(map!=-1)[0]
+
     pops=numpy.loadtxt('%s/Populations.dat' % modeldir)
     map=numpy.loadtxt('%s/Mapping.dat' % modeldir)
     unbound=numpy.loadtxt('%s/tpt-%s/unbound_%s_states.txt' % (modeldir, type, type), dtype=int)
@@ -45,51 +46,50 @@ def main(dir, coarse , lag, type):
     print committors
     colors=['red', 'orange', 'green', 'cyan', 'blue', 'purple']
     colors=colors*40
-    for op in data.keys():
-        if op=='com':
-            continue
-        map_com=[]
-        map_rmsd=[]
-        for x in range(0, len(data[op])):
-            if map[x]!=-1:
-                map_com.append(data['com'][x])
-                map_rmsd.append(data[op][x])
-        map_com=numpy.array(map_com)
-        map_rmsd=numpy.array(map_rmsd)
-        for p in range(0, 20):
-            pylab.figure()
-            path=paths['Paths'][p]
-            print "Bottleneck", paths['Bottlenecks'][p]
-            flux=paths['fluxes'][p]/paths['fluxes'][0]
-            if flux < 0.2:
-                break
-            print "flux %s" % flux
-            frames=numpy.where(path!=-1)[0]
-            path=numpy.array(path[frames], dtype=int)
-            size=(paths['fluxes'][p]/paths['fluxes'][0])*1000
-            for j in paths['Bottlenecks'][p]:
-                pylab.scatter(map_com[j], map_rmsd[j], marker='x', c=colors[p], alpha=0.7, s=size*2)
-                location=numpy.where(committors==j)[0]
-                if location.size:
-                    print "path %s state %s bottleneck in committors" % (p, j)
-                    print map_com[j], map_rmsd[j]
-            pylab.scatter(map_com[path], map_rmsd[path], c=colors[p], alpha=0.7, s=size)
-            pylab.hold(True)
-            pylab.title('P-L COM vs. L %s' % op)
-            pylab.xlabel('PL-COM')
-            pylab.ylabel(op)
-            pylab.xlim(0,4)
-            pylab.ylim(0,max(map_rmsd+5))
+    map_com=[]
+    map_rmsd=[]
+    for x in range(0, len(data['rmsd'])):
+        if map[x]!=-1:
+            map_com.append(data['com'][x])
+            map_rmsd.append(data['rmsd'][x])
+    map_com=numpy.array(map_com)
+    map_rmsd=numpy.array(map_rmsd)
+    if type=='strict':
+        ref=5
+    elif type=='medium':
+        ref=10
+    elif type=='loose':
+        ref=15
+    for p in range(0, 10):
+        pylab.figure()
+        path=paths['Paths'][p]
+        print "Bottleneck", paths['Bottlenecks'][p]
+        flux=paths['fluxes'][p]/paths['fluxes'][0]
+        if flux < 0.2:
+            break
+        print "flux %s" % flux
+        frames=numpy.where(path!=-1)[0]
+        path=numpy.array(path[frames], dtype=int)
+        size=(paths['fluxes'][p]/paths['fluxes'][0])*1000
+        for j in paths['Bottlenecks'][p]:
+            pylab.scatter(map_com[j], map_rmsd[j], marker='x', c=colors[p], alpha=0.7, s=size*2)
+            location=numpy.where(committors==j)[0]
+            if location.size:
+                print "path %s state %s bottleneck in committors" % (p, j)
+                print map_com[j], map_rmsd[j]
+        pylab.scatter(map_com[path], map_rmsd[path], c=colors[p], alpha=0.7, s=size)
+        pylab.plot([ref]*10, numpy.arange(0, max(data['rmsd']), max(data['rmsd'])/10), 'r--')
+        pylab.hold(True)
+        pylab.xlabel('PL-COM')
+        pylab.ylabel('L RMSD')
+        pylab.xlim(0,max(map_com)+5)
+        pylab.ylim(0,max(map_rmsd+5))
     pylab.show()
 
 def parse_commandline():
     parser = optparse.OptionParser()
     parser.add_option('-d', '--dir', dest='dir',
                       help='directory')
-    parser.add_option('-c', '--coarse', dest='coarse',
-                      help='coarse grain cutoff')
-    parser.add_option('-l', '--lag', dest='lag',
-                      help='lag time')
     parser.add_option('-t', '--type', dest='type',
                       help='type')
     (options, args) = parser.parse_args()
@@ -98,5 +98,5 @@ def parse_commandline():
 #run the function main if namespace is main
 if __name__ == "__main__":
     (options, args) = parse_commandline()
-    main(dir=options.dir, coarse=options.coarse, lag=options.lag, type=options.type)
+    main(modeldir=options.dir, type=options.type)
 

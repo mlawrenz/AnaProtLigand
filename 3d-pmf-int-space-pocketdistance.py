@@ -97,20 +97,21 @@ def parallel_distance(nproc, ligcoors, protcoors, ofile, completed=None):
     return completed
 
 def main(system, genfile, lag, volume, nproc):
-    if not os.path.exists('target.txt'):
-        print "need target.txt with experimental value"
-        sys.exit()
     lag=int(lag)
     dir=os.path.dirname(genfile)
+    if not os.path.exists('%s/target.txt' % dir.split('Data')[0]):
+        print "need target.txt with experimental value"
+        sys.exit()
+    ref=loadtxt('%s/target.txt' % dir.split('Data')[0])
     filename=genfile.split(dir)[1].split('.xtc')[0]
     if "Coarse" in filename:
         coarse=filename.split('Coarsed')[1].split('_')[0]
         rcut=filename.split('_r')[1].split('_')[0]
         modeldir='%s/msml%s_coarse_r%s_d%s/' % ( dir.split('/')[0], lag, rcut, coarse)
     else:
-        modeldir='%s/msml%s' % (dir.split('/')[0], lag)
+        modeldir='%s/msml%s' % (dir, lag)
     print "computing PMF from %s with lag %s frames" % (filename, lag)
-    conf=Trajectory.load_from_pdb('%s_noh.pdb' % system)
+    conf=Trajectory.load_from_pdb('%s/%s_noh.pdb' % (dir.split('Data')[0], system))
     lig_atoms=conf['XYZList'].shape[1]
     map=loadtxt('%s/Mapping.dat' % modeldir)
     pops=loadtxt('%s/Populations.dat' % modeldir)
@@ -197,7 +198,6 @@ def main(system, genfile, lag, volume, nproc):
         savetxt('%s/%s_k%s_l%s_pocketdistance_free.dat' % (modeldir, filename, k, lag), [x+correction for x in frees])
         savetxt('%s/%s_k%s_l%s_pocketdistance_volume.dat' % (modeldir, filename, k, lag), volumes)
         savetxt('%s/%s_k%s_l%s_pocketdistance_axis.dat' % (modeldir, filename, k, lag), axis)
-        ref=loadtxt('target.txt') # , usecols=(1,))
         pylab.figure()
         #pylab.plot(axis, corrs, color='green', label='correction')
         pylab.plot(axis, [ref]*len(frees), color='black', label='exp')
