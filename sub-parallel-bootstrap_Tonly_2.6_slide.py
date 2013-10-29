@@ -1,4 +1,5 @@
 import multiprocessing
+import time
 from msmbuilder import io
 from msmbuilder import MSMLib, Project
 from scipy.io import *
@@ -12,24 +13,34 @@ import pylab
 
 def parallel_get_matrix(input):
     print "working"
-    (Ttest, multinom, NumStates)=input
+    (Ttest, multinom, n)=input
+    NumStates=Ttest.shape[0]
+    numpy.random.seed(int(time.time()*(n+1)))
     newT=scipy.sparse.lil_matrix((int(NumStates),int(NumStates)),dtype='float32')
     for i in range(0, Ttest.shape[1]):
         transitions = numpy.row_stack((numpy.array([i]*NumStates),numpy.arange(0, NumStates)))
         pvals=numpy.array([x/sum(Ttest[i]) for x in Ttest[i]])
         counts=numpy.random.multinomial(int(multinom), pvals, size=1)
         newT=newT+scipy.sparse.coo_matrix((counts[0], transitions),shape=(NumStates,NumStates))
-    rev_counts, t_matrix, Populations, Mapping = MSMLib.build_msm(newT, symmetrize='MLE', ergodic_trimming=True)
-    return rev_counts, t_matrix, Populations, Mapping
+    frames=numpy.where(newT==0)
+    newT[frames]=1
+    return newT
 
 def main(assfile, lag, nproc):
     lag=int(lag)
     nproc=int(nproc)
     Assignments=io.loadh(assfile)
+    num=int(assfile.split('Assignments_sub')[1].split('.h5')[0])
     dir=os.path.dirname(assfile)
-    newdir='%s/sample-counts' % dir
+    newdir='%s/boot-sub%s' % (dir, num)
+    ref_sub=numpy.loadtxt('%s/times.h5' % dir, usecols=(1,))
+    ref_total=numpy.loadtxt('%s/times.h5' % dir, usecols=(2,))
+    times=dict()
+    for (i,j) in zip(ref_sub, ref_total):
+        times[i]=j
+
     proj=Project.load_from('%s/ProjectInfo.yaml' % dir.split('Data')[0])
-    multinom=sum(proj.traj_lengths)
+    multinom=int(times[num])
     if not os.path.exists(newdir):
         os.mkdir(newdir)
     if 'Data' in Assignments.keys():
@@ -59,19 +70,18 @@ def main(assfile, lag, nproc):
             nproc=remain
         print "sampling iteration %s" % iteration
         Tfresh=T.copy()
-        input = zip([Tfresh,], [multinom,], [NumStates,])
-        result = map(parallel_get_matrix, input)
-        #pool = multiprocessing.Pool(processes=nproc)
-        #result = pool.map_async(parallel_get_matrix, input)
-        #result.wait()
-        #all = result.get()
-        #pool.terminate()
-        all=result
-        for x in all:
-            rev_counts, t_matrix, Populations, Mapping=x
-            scipy.io.mmwrite('%s/tProb-%s' % (newdir, iteration), t_matrix)
-            numpy.savetxt('%s/Populations-%s' % (newdir, iteration), Populations)
-            numpy.savetxt('%s/Mapping-%s' % (newdir, iteration), Mapping)
+        input = zip([Tfresh]*nproc, [multinom]*nproc, range(0, NumStates))
+        pool = multiprocessing.Pool(processes=nproc)
+        result = pool.map_async(parallel_get_matrix, input)
+        result.wait()
+        all = result.get()
+        pool.terminate()
+        for c_matrix in all:
+            scipy.io.mmwrite('%s/tCounts-%s' % (newdir, iteration), c_matrix)
+            #rev_counts, t_matrix, Populations, Mapping=x
+            #scipy.io.mmwrite('%s/tProb-%s' % (newdir, iteration), t_matrix)
+            #numpy.savetxt('%s/Populations-%s' % (newdir, iteration), Populations)
+            #numpy.savetxt('%s/Mapping-%s' % (newdir, iteration), Mapping)
             iteration+=1
         count+=1
         print "dont with iteration %s" % iteration*nproc

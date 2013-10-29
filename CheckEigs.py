@@ -78,7 +78,7 @@ def main(modeldir, gensfile, write=False):
     cm=pylab.cm.get_cmap('RdYlBu_r') #blue will be negative components, red positive
 
     print numpy.shape(eigs_m[1][:,1])
-    for i in range(0,3):
+    for i in range(0,1):
         order=numpy.argsort(eigs_m[1][:,i])
         if i==0:
             maxes=[]

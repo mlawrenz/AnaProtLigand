@@ -24,45 +24,66 @@ def map_size(x):
         size=50
     return size
 
-def main(modeldir, type):
+def main(modeldir, start, type):
+    start=int(start)
     data=dict()
     project=Project.load_from('%s/ProjectInfo.yaml' % modeldir.split('Data')[0])
-    data=dict()
-    data['rmsd']=numpy.loadtxt('%s/Gens.rmsd.dat' % modeldir, usecols=(2,))
-    com=numpy.loadtxt('%s/Gens.vmd_com.dat' % modeldir, usecols=(1,))
-    refcom=com[0]
-    data['com']=com[1:]
-    data['com']=numpy.array(data['com'])
-    pops=numpy.loadtxt('%s/Populations.dat' % modeldir)
-    map=numpy.loadtxt('%s/Mapping.dat' % modeldir)
-    frames=numpy.where(map!=-1)[0]
-
-    pops=numpy.loadtxt('%s/Populations.dat' % modeldir)
-    map=numpy.loadtxt('%s/Mapping.dat' % modeldir)
+    files=glob.glob('%s/fkbp*xtal.pdb' % modeldir.split('Data')[0])
+    pdb=files[0]
     unbound=numpy.loadtxt('%s/tpt-%s/unbound_%s_states.txt' % (modeldir, type, type), dtype=int)
-    bound=numpy.loadtxt('%s/tpt-%s/bound_%s_states.txt' % (modeldir, type, type), dtype=int)
-
-    ass=io.loadh('%s/Assignments.Fixed.h5' % modeldir)
     T=mmread('%s/tProb.mtx' % modeldir)
-    paths=io.loadh('%s/tpt-%s/Paths.h5' % (modeldir, type))
+    startstate=unbound[start]
+    ass=io.loadh('%s/Assignments.Fixed.h5' % modeldir)
 
-    steps=10000
-    for startstate in unbound:
-        print "on start state %s" % startstate
-        movie=project.empty_traj()
+    steps=100000
+    print "on start state %s" % startstate
+    if os.path.exists('%s/tpt-%s/movie_state%s_1millisec.states.dat' % (modeldir, type, startstate)):
+        print "loading from states"
+        traj=numpy.loadtxt('%s/tpt-%s/movie_state%s_1millisec.states.dat' % (modeldir, type, startstate))
+    else:
         traj=msm_analysis.sample(T, int(startstate),int(steps))
-        for (n, state) in enumerate(traj):
-            t=project.get_random_confs_from_states(ass['arr_0'], [int(state),], 20)
-            if n==0:
-                movie['XYZList']=t[0]['XYZList']
-            else:
-                movie['XYZList']=numpy.vstack((movie['XYZList'], t[0]['XYZList']))
-        movie.save_to_xtc('%s/tpt-%s/movie_state%s_100microsec.xtc' % (modeldir, type, startstate))
+        numpy.savetxt('%s/tpt-%s/movie_state%s_1millisec.states.dat' % (modeldir, type, startstate), traj)
+    print "checking for chkpt file"
+    checkfile=glob.glob('%s/tpt-%s/movie_state%s_*chkpt' % (modeldir, type, startstate))
+    if len(checkfile) > 0:
+        movie=Trajectory.load_from_xtc(checkfile[0], PDBFilename=pdb)
+        n=int(checkfile[0].split('xtc.state')[1].split('chkpt')[0])
+        os.system('mv %s %s.chkpt.cp' % (checkfile[0], checkfile[0].split('.xtc')[0]))
+        print "checkpointing at state index %s out of %s" % (n, len(traj))
+        checkfile=checkfile[0]
+        restart=True
+    else:
+        restart=False
+        n=0
+        movie=project.empty_traj()
+    while n < len(traj):
+        print "on state %s" % n
+        state=int(traj[n])
+        t=project.get_random_confs_from_states(ass['arr_0'], [int(state),], 10)
+        if n==0:
+            movie['XYZList']=t[0]['XYZList']
+            n+=1
+            continue
+        elif n % 100==0:
+            movie['XYZList']=numpy.vstack((movie['XYZList'], t[0]['XYZList']))
+            if restart==True:
+                os.system('mv %s %s.chkpt.cp' % (checkfile, checkfile.split('.xtc')[0]))
+            movie.save_to_xtc('%s/tpt-%s/movie_state%s_1millisec.xtc.state%schkpt' % (modeldir, type, startstate, n))
+            checkfile='%s/tpt-%s/movie_state%s_1millisec.xtc.state%schkpt' % (modeldir, type, startstate, n)
+            n+=1
+            continue
+        elif n!=0:
+            movie['XYZList']=numpy.vstack((movie['XYZList'], t[0]['XYZList']))
+            n+=1
+            continue
+    movie.save_to_xtc('%s/tpt-%s/movie_state%s_1millisec.xtc' % (modeldir, type, startstate))
 
 def parse_commandline():
     parser = optparse.OptionParser()
     parser.add_option('-d', '--dir', dest='dir',
                       help='directory')
+    parser.add_option('-s', '--start', dest='start',
+                      help='start index of unbound states')
     parser.add_option('-t', '--type', dest='type',
                       help='type')
     (options, args) = parser.parse_args()
@@ -71,5 +92,5 @@ def parse_commandline():
 #run the function main if namespace is main
 if __name__ == "__main__":
     (options, args) = parse_commandline()
-    main(dir=options.dir,  type=options.type)
+    main(modeldir=options.dir,  start=options.start, type=options.type)
 

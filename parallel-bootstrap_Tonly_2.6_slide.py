@@ -12,15 +12,19 @@ import pylab
 
 def parallel_get_matrix(input):
     print "working"
-    (Ttest, multinom, NumStates)=input
+    (Ttest, multinom, NumStates, n)=input
+    numpy.random.seed(int(time.time()*(n+1)))
     newT=scipy.sparse.lil_matrix((int(NumStates),int(NumStates)),dtype='float32')
     for i in range(0, Ttest.shape[1]):
         transitions = numpy.row_stack((numpy.array([i]*NumStates),numpy.arange(0, NumStates)))
         pvals=numpy.array([x/sum(Ttest[i]) for x in Ttest[i]])
         counts=numpy.random.multinomial(int(multinom), pvals, size=1)
         newT=newT+scipy.sparse.coo_matrix((counts[0], transitions),shape=(NumStates,NumStates))
-    rev_counts, t_matrix, Populations, Mapping = MSMLib.build_msm(newT, symmetrize='MLE', ergodic_trimming=True)
-    return rev_counts, t_matrix, Populations, Mapping
+    frames=numpy.where(newT==0)
+    newT[frames]=1
+    return newT
+    #rev_counts, t_matrix, Populations, Mapping = MSMLib.build_msm(newT, symmetrize='MLE', ergodic_trimming=True)
+    #return rev_counts, t_matrix, Populations, Mapping
 
 def main(assfile, lag, nproc):
     lag=int(lag)
@@ -59,19 +63,20 @@ def main(assfile, lag, nproc):
             nproc=remain
         print "sampling iteration %s" % iteration
         Tfresh=T.copy()
-        input = zip([Tfresh,], [multinom,], [NumStates,])
-        result = map(parallel_get_matrix, input)
-        #pool = multiprocessing.Pool(processes=nproc)
-        #result = pool.map_async(parallel_get_matrix, input)
-        #result.wait()
-        #all = result.get()
-        #pool.terminate()
-        all=result
-        for x in all:
-            rev_counts, t_matrix, Populations, Mapping=x
-            scipy.io.mmwrite('%s/tProb-%s' % (newdir, iteration), t_matrix)
-            numpy.savetxt('%s/Populations-%s' % (newdir, iteration), Populations)
-            numpy.savetxt('%s/Mapping-%s' % (newdir, iteration), Mapping)
+        counts=range(0, nproc)
+        input = zip([Tfresh]*nproc, [multinom]*nproc, [NumStates]*nproc, counts)
+        pool = multiprocessing.Pool(processes=nproc)
+        result = pool.map_async(parallel_get_matrix, input)
+        result.wait()
+        all = result.get()
+        print "computed resampled matrices"
+        pool.terminate()
+        for count_matrix in all:
+            #rev_counts, t_matrix, Populations, Mapping=x
+            scipy.io.mmwrite('%s/tCounts-%s' % (newdir, iteration), count_matrix)
+           # scipy.io.mmwrite('%s/tProb-%s' % (newdir, iteration), t_matrix)
+           # numpy.savetxt('%s/Populations-%s' % (newdir, iteration), Populations)
+           # numpy.savetxt('%s/Mapping-%s' % (newdir, iteration), Mapping)
             iteration+=1
         count+=1
         print "dont with iteration %s" % iteration*nproc

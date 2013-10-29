@@ -13,20 +13,27 @@ def main(file):
         os.mkdir(newdir)
     p=Project.load_from('%s/ProjectInfo.yaml' % dir.split('Data')[0])
     data=dict()
+    totals=dict()
     iterations=int(ass['arr_0'].shape[1]/10.0)
     start=max(p.traj_lengths)
     for iter in range(0, iterations):
         new=start-10
         if new < 10:
             break
+        totals[new]=0
         data[new]=-numpy.ones((ass['arr_0'].shape[0], new), dtype=int)
         for i in range(0, ass['arr_0'].shape[0]):
             data[new][i]=ass['arr_0'][i][:new]
+            frames=numpy.where(data[new][i]!=-1)[0]
+            totals[new]+=len(frames)
         start=new
 
+    ohandle=open('%s/times.h5' % (newdir), 'w')
     for key in sorted(data.keys()):
         print data[key].shape
-        io.saveh('%s/%s_sub%s.h5' % (newdir, base.split('.h5')[0], key), data[key])
+        print "total time is %s" % totals[key]
+        ohandle.write('%s\t%s\t%s\n' % (data[key].shape[0], data[key].shape[1], totals[key]))
+        #io.saveh('%s/%s_sub%s.h5' % (newdir, base.split('.h5')[0], key), data[key])
 
 def parse_commandline():
     parser = optparse.OptionParser()

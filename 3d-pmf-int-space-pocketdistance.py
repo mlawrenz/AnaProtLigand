@@ -103,7 +103,7 @@ def main(system, genfile, lag, volume, nproc):
         print "need target.txt with experimental value"
         sys.exit()
     ref=loadtxt('%s/target.txt' % dir.split('Data')[0])
-    filename=genfile.split(dir)[1].split('.xtc')[0]
+    filename=genfile.split(dir)[1].split('.lh5')[0]
     if "Coarse" in filename:
         coarse=filename.split('Coarsed')[1].split('_')[0]
         rcut=filename.split('_r')[1].split('_')[0]
@@ -116,7 +116,7 @@ def main(system, genfile, lag, volume, nproc):
     map=loadtxt('%s/Mapping.dat' % modeldir)
     pops=loadtxt('%s/Populations.dat' % modeldir)
 
-    ligfile='%s.vmd_ligcoords.pickle' % genfile.split('.xtc')[0]
+    ligfile='%s.vmd_ligcoords.pickle' % genfile.split('.lh5')[0]
     if os.path.exists(ligfile):
         lighandle=open(ligfile, 'rb')
     else:
@@ -128,7 +128,7 @@ def main(system, genfile, lag, volume, nproc):
     mapped_ligcoors, x_range, y_range, z_range, box_volume=get_minmax(ligcoors, map)
     correction=-0.6*log(box_volume/1600.0)
     # get prot-lig distances
-    com_distances=loadtxt('%s.vmd_com.dat' % genfile.split('.xtc')[0], usecols=(1,))
+    com_distances=loadtxt('%s.vmd_com.dat' % genfile.split('.lh5')[0], usecols=(1,))
     ref_com=com_distances[0]
     com_distances=com_distances[1:]
     if len(com_distances)==len(map):
@@ -220,7 +220,7 @@ def parse_commandline():
     parser.add_option('-s', '--system', dest='system',
                       help='input system')
     parser.add_option('-g', '--genfile', dest='genfile',
-                      help='input gens file xtc')
+                      help='input gens file lh5')
     parser.add_option('-l', '--lag', dest='lag',
                           help='lag time in steps')
     parser.add_option('-v', '--volume', dest='volume',

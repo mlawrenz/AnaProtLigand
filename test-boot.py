@@ -12,29 +12,39 @@ import pickle
 import numpy
 import pylab
 
-global counter
-counter = 0
 
-def cb(r):
-    global counter
-    print counter, r
-    counter +=1
-    
+
 def parallel_get_matrix(input):
-    print "working"
-    (Ttest, multinom)=input
-    NumStates=Ttest.shape[0]
+    (T, multinom, n)=input
+    #print "working"
+    NumStates=T.shape[0]
+    numpy.random.seed(int(time.time()*(n+1)))
     newT=scipy.sparse.lil_matrix((int(NumStates),int(NumStates)),dtype='float32')
-    for i in range(0, Ttest.shape[1]):
+    for i in range(0, T.shape[1]):
         transitions = numpy.row_stack((numpy.array([i]*NumStates),numpy.arange(0, NumStates)))
-        pvals=numpy.array([x/sum(Ttest[i]) for x in Ttest[i]])
+        pvals=numpy.array([x/sum(T[i]) for x in T[i]])
         counts=numpy.random.multinomial(int(multinom), pvals, size=1)
         newT=newT+scipy.sparse.coo_matrix((counts[0], transitions),shape=(NumStates,NumStates))
     return newT.todense()
 
+def parallel_get_matrix_multi_row(input):
+    #print "working"
+    (T, multinom, rows)=input
+    NumStates=T.shape[0]
+    tmp=scipy.sparse.lil_matrix((int(NumStates),int(NumStates)))
+    for i in rows:
+        numpy.random.seed(int(time.time()*(i+1)))
+        NumStates=T.shape[0]
+        transitions = numpy.row_stack((numpy.array([i]*NumStates),numpy.arange(0, NumStates)))
+        pvals=numpy.array([x/sum(T[i]) for x in T[i]])
+        counts=numpy.random.multinomial(int(multinom), pvals, size=1)
+        tmp=tmp+scipy.sparse.coo_matrix((counts[0], transitions),shape=(NumStates,NumStates))
+    return tmp
+
 def parallel_get_matrix_row(input):
-    print "working"
+    #print "working"
     (T, multinom, i)=input
+    numpy.random.seed(int(time.time()*(i+1)))
     NumStates=T.shape[0]
     transitions = numpy.row_stack((numpy.array([i]*NumStates),numpy.arange(0, NumStates)))
     pvals=numpy.array([x/sum(T[i]) for x in T[i]])
@@ -57,17 +67,10 @@ def test_map(T, multinom):
 
 
 
-def compute_rows_all(input, nproc):
-    pool = multiprocessing.Pool(processes=nproc)
-    result = pool.map_async(parallel_get_matrix, input)
-    result.wait()
-    all = result.get()
-    pool.terminate()
-    return all
 
-def compute_rows(input, nproc):
+def compute_multi_rows(input, nproc):
     pool = multiprocessing.Pool(processes=nproc)
-    result = pool.map_async(parallel_get_matrix_row, input)
+    result = pool.map_async(parallel_get_matrix_multi_row, input)
     result.wait()
     all = result.get()
     pool.terminate()
@@ -76,90 +79,100 @@ def compute_rows(input, nproc):
 def test_pool_map(T, multinom, nproc):
     #look over rows
     NumStates=T.shape[0]
-    newT=scipy.sparse.lil_matrix((int(NumStates),int(NumStates)),dtype='float32')
+    newT=scipy.sparse.lil_matrix((int(NumStates),int(NumStates)))
     rows=[]
     remain=T.shape[0] % nproc
     row_indices=range(0, T.shape[1])
+    chunks=dict()
+    count=0
+    chunksize=T.shape[1]/nproc
+    chunks[count]=[]
+    remain=T.shape[1] % nproc
+    remainmax=T.shape[1]-remain
     for i in row_indices:
-        if i==0:
-            rows.append(i)
-            continue
-        # below is if at end without remainder
-        if i==max(row_indices):
-            rows.append(i)
-            input = zip([T]*nproc, [multinom]*nproc, rows)
-            all=compute_rows(input, nproc)
-            for (n, k) in enumerate(rows):
-                newT=newT+all[n]
-            break
-        # below is if at end with remainder
-        if i == T.shape[0]-remain:
-            if len(rows)>0:
-                # finish previous list triggered
-                input = zip([T]*nproc, [multinom]*nproc, rows)
-                all=compute_rows(input, nproc)
-                for (n, k) in enumerate(rows):
-                    newT=newT+all[n]
-                    rows=[]
-            nproc=remain
-            for k in range(i, i+remain):
-                rows.append(k)
-            input = zip([T]*nproc, [multinom]*nproc, rows)
-            all=compute_rows(input, nproc)
-            for (n, k) in enumerate(rows):
-                newT=newT+all[n]
-            break
-        if i % nproc == 0:
-            input = zip([T]*nproc, [multinom]*nproc, rows)
-            all=compute_rows(input, nproc)
-            for (n, k) in enumerate(rows):
-                newT=newT+all[n]
-            rows=[]
-            rows.append(i)
+        if i % chunksize==0:
+            if i==0:
+                chunks[count].append(i)
+                continue
+            else:
+                count+=1
+                chunks[count]=[]
+                chunks[count].append(i)
         else:
-            rows.append(i)
+            chunks[count].append(i)
+    ordered_chunks=[]
+    for key in sorted(sorted(chunks.keys())):
+        if key >= nproc:
+            remainchunk=chunks[key]
+            chunks.pop(key)
+        else:
+            ordered_chunks.append(chunks[key])
+            remainchunk=None
+    # distribute to processors
+    input = zip([T]*nproc, [multinom]*nproc, ordered_chunks)
+    all=compute_multi_rows(input, nproc)
+    for (n, k) in enumerate(all):
+        newT=newT+all[n]
+    # do remain
+    if remainchunk!=None:
+        for i in remainchunk:
+            input=zip( [T], [multinom,], [i,])
+            result = map(parallel_get_matrix_row, input)
+            newT=newT+result[0]
+    else:
+        pass
     return newT.todense()
 
 
 
 def main(nproc):
-    multinom=100
+    multinom=1000000
     nproc=int(nproc)
-    NumStates=15
+    NumStates=10
     C = scipy.sparse.lil_matrix((int(NumStates), int(NumStates)))
     C=C.todense()
     for i in range(0, NumStates):
         for j in range(0, NumStates):
             C[i,j]=random.randint(1,100)
     ### testing non parallel
-    serial=dict()
-    for iteration in range(0,4):
-        T=numpy.array(C.copy())
-        newT=test_map(T, multinom)
-        serial[iteration]=newT
-    import pdb
-    pdb.set_trace()
+    #serial=dict()
+    #for iteration in range(0,4):
+    #    T=numpy.array(C.copy())
+    #    newT=test_map(T, multinom)
+    #    serial[iteration]=newT
     ### testing all at once
     all_matrices=dict()
     start = time.clock()
+    print "on all-at-once method"
     T=numpy.array(C.copy())
-    input = zip([T]*nproc, [multinom]*nproc)
-    all=compute_rows_all(input, nproc)
-    for (n,z) in enumerate(all):
-        all_matrices[n]=z
+    input = zip([T]*nproc, [multinom]*nproc, range(0, nproc) )
+    iteration=dict()
+    pool = multiprocessing.Pool(processes=nproc)
+    result = pool.map_async(parallel_get_matrix, input)
+    result.wait()
+    all = result.get()
+    pool.close()
+    pool.join()
     elapsed = (time.clock() - start)
     print "parallel T %s elapsed s" % elapsed
-    ### testing row by row
+    for (n,z) in enumerate(all):
+        all_matrices[n]=z
+        #print "all method iteration %s last row of final matrix: " % n, z[-1]
+    ## testing row by row
+    print "on row-by-row method"
+    start = time.clock()
     row_matrices=dict()
     for iteration in range(0,4):
         T=numpy.array(C.copy())
-        start = time.clock()
         newT=test_pool_map(T, multinom, nproc)
-        row_matrices[iteration]=newT
+        frames=numpy.where(newT==0)
+        newT[frames]=1
+        #print "row method iteration %s last row of final matrix: " % iteration, newT[-1]
+        #print newT
+        #print "-----------------"
+        #row_matrices[iteration]=newT
     elapsed = (time.clock() - start)
     print "parallel_row %s elapsed s" % elapsed
-    import pdb
-    pdb.set_trace()
     #print "old T", C
     #print "new T", newT
     

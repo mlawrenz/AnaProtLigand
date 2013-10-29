@@ -22,11 +22,11 @@ def main(modeldir, gensfile, write=False):
     data['com']=numpy.array(data['com'])
     data['rmsd']=numpy.array(data['rmsd'])
     unbound_touch1=numpy.where(data['dist'] > 20.0)[0]
-    bound1=numpy.where(data['com']<4)[0]
+    bound1=numpy.where(data['rmsd']<3)[0]
     print "%s super strict bound states" % len(data['dist'][bound1])
     print "%s super strict unbound states" % len(data['dist'][unbound_touch1])
     unbound_touch2=numpy.where(data['dist'] > 12.0)[0]
-    bound2=numpy.where(data['com']<7)[0]
+    bound2=numpy.where(data['rmsd']<7)[0]
     print "%s strict unbound states" % len(data['dist'][unbound_touch2])
     unbound_touch3=numpy.where(data['dist'] > 8.0)[0]
     bound3=numpy.where(data['com']<10)[0]
@@ -43,7 +43,7 @@ def main(modeldir, gensfile, write=False):
     binds=[bound1, bound1, bound1, bound1]
     names=['super-strict', 'strict', 'medium', 'loose']
     for (u, b, name) in zip(unbinds, binds, names):
-        dirs[name]='%s/tpt-%s' % (modeldir, name)
+        dirs[name]='%s/tpt-rmsd-%s' % (modeldir, name)
         if not os.path.exists(dirs[name]):
             os.mkdir(dirs[name])
         ohandle=open('%s/unbound_%s_states.txt' % (dirs[name], name), 'w')
