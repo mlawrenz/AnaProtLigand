@@ -8,42 +8,38 @@ import os
 from numpy import linalg
 
 
-def main(modeldir, gensfile, write=False):
-    proj=Project.load_from('%s/ProjectInfo.yaml' % modeldir.split('Data')[0])
-    ass=io.loadh('%s/Assignments.Fixed.h5' % modeldir)
+def main(dir, rcut,  coarse , lag):
+    proj=Project.load_from('../sirtuin_round1/ProjectInfo.yaml')
+    ass=io.loadh('%s/msml%s_coarse_r%s_d%s/Assignments.Fixed.h5' % (dir, lag, rcut, coarse))
     data=dict()
-    data['dist']=numpy.loadtxt('%s.prot_lig_distance.dat' % gensfile.split('.lh5')[0], usecols=(1,))
-    data['rmsd']=numpy.loadtxt('%s.rmsd.dat' % gensfile.split('.lh5')[0])
-    com=numpy.loadtxt('%s.vmd_com.dat' % gensfile.split('.lh5')[0], usecols=(1,))
+    data['dist']=numpy.loadtxt('%s/Coarsed_r%s_gen/Coarsed%s_r%s_Gens.prot_lig_distance.dat' % (dir, rcut, coarse, rcut), usecols=(1,))
+    rmsd=numpy.loadtxt('%s/Coarsed_r%s_gen/Coarsed%s_r%s_Gens.rmsd.dat' % (dir, rcut, coarse, rcut))
+    data['rmsd']=numpy.loadtxt('%s/Coarsed_r%s_gen/Coarsed%s_r%s_Gens.selfrmsd.dat' % (dir, rcut, coarse, rcut))
+    data['helixrmsd']=numpy.loadtxt('%s/Coarsed_r%s_gen/Coarsed%s_r%s_Gens.helixrmsd.dat' % (dir, rcut, coarse, rcut))
+    com=numpy.loadtxt('%s/Coarsed_r%s_gen/Coarsed%s_r%s_Gens.vmd_com.dat' % (dir, rcut, coarse, rcut), usecols=(1,))
+    com=[i/com[0] for i in com]
     data['com']=com[1:]
-    pops=numpy.loadtxt('%s/Populations.dat' % modeldir)
-    map=numpy.loadtxt('%s/Mapping.dat' % modeldir)
+    pops=numpy.loadtxt('%s/msml%s_coarse_r%s_d%s/Populations.dat' % (dir, lag, rcut, coarse))
+    map=numpy.loadtxt('%s/msml%s_coarse_r%s_d%s/Mapping.dat' % (dir, lag, rcut, coarse))
 
     data['com']=numpy.array(data['com'])
     data['rmsd']=numpy.array(data['rmsd'])
-    unbound_touch1=numpy.where(data['dist'] > 20.0)[0]
-    bound1=numpy.where(data['com']<4)[0]
-    print "%s super strict bound states" % len(data['dist'][bound1])
-    print "%s super strict unbound states" % len(data['dist'][unbound_touch1])
-    unbound_touch2=numpy.where(data['dist'] > 12.0)[0]
-    bound2=numpy.where(data['com']<7)[0]
-    print "%s strict unbound states" % len(data['dist'][unbound_touch2])
-    unbound_touch3=numpy.where(data['dist'] > 8.0)[0]
-    bound3=numpy.where(data['com']<10)[0]
-    print "%s medium unbound states" % len(data['rmsd'][unbound_touch3])
-    unbound_touch4=numpy.where(data['dist'] > 4.0)[0]
-    bound4=numpy.where(data['com']<15)[0]
-    print "%s loose unbound states" % len(data['rmsd'][unbound_touch4])
+    unbound_touch=numpy.where(data['dist'] > 4.0)[0]
+    print "%s non touching unbound states" % len(data['dist'][unbound_touch])
+    unbound_far_touch=numpy.where(data['dist'] > 8.0)[0]
+    print "%s far non touching unbound states" % len(data['dist'][unbound_far_touch])
+    bound1=numpy.where((data['helixrmsd']<1.5))[0] # &(data['com']<5.0))[0]
+    print "%s strict bound" % len(bound1)
+    bound2=numpy.where((data['helixrmsd']<2.0))[0] # &(data['com']<5.0))[0]
+    print "%s loose bound" % len(bound2)
 
     dirs=dict()
 
-    #unbinds=[unbound_touch, unbound_touch, unbound_touch, unbound_touch]
-    #binds=[bound1, bound2, bound3, bound4]
-    unbinds=[unbound_touch1, unbound_touch2, unbound_touch3, unbound_touch4]
-    binds=[bound1, bound1, bound1, bound1]
-    names=['super-strict', 'strict', 'medium', 'loose']
+    unbinds=[unbound_touch, unbound_touch, unbound_far_touch]
+    binds=[bound1, bound2, bound1]
+    names=['strict', 'medium' , 'far']
     for (u, b, name) in zip(unbinds, binds, names):
-        dirs[name]='%s/tpt-%s' % (modeldir, name)
+        dirs[name]='%s/msml%s_coarse_r%s_d%s/tpt-%s' % (dir, lag, rcut, coarse, name)
         if not os.path.exists(dirs[name]):
             os.mkdir(dirs[name])
         ohandle=open('%s/unbound_%s_states.txt' % (dirs[name], name), 'w')
@@ -52,11 +48,10 @@ def main(modeldir, gensfile, write=False):
             ghandle.write('%s\n' % i)
             if map[i]!=-1:
                 ohandle.write('%s\n' % int(map[i]))
-                if write==True:
-                    if not os.path.exists('%s/unbound_state%s.xtc' % (dirs[name], int(map[i]))):
-                        t=proj.get_random_confs_from_states(ass['arr_0'], [map[i],], 100)
-                        print "writing unbound state %s xtc" % map[i]
-                        t[0].save_to_xtc('%s/unbound_state%s.xtc' % (dirs[name], int(map[i])))
+                #if not os.path.exists('%s/unbound_state%s.xtc' % (dirs[name], int(map[i]))):
+                #    t=proj.get_random_confs_from_states(ass['arr_0'], [map[i],], 100)
+                #    print "writing unbound state %s xtc" % map[i]
+                #    t[0].save_to_xtc('%s/unbound_state%s.xtc' % (dirs[name], int(map[i])))
     
         ohandle=open('%s/bound_%s_states.txt' % (dirs[name], name), 'w')
         ghandle=open('%s/gen_bound_%s_states.txt' % (dirs[name], name), 'w')
@@ -64,27 +59,26 @@ def main(modeldir, gensfile, write=False):
             ghandle.write('%s\n' % i)
             if map[i]!=-1:
                 ohandle.write('%s\n' % int(map[i]))
-                if write==True:
-                    if not os.path.exists('%s/bound_state%s.xtc' % (dirs[name], int(map[i]))):
-                        t=proj.get_random_confs_from_states(ass['arr_0'], [map[i],], 100)
-                        print "writing bound state %s xtc" % map[i]
-                        t[0].save_to_xtc('%s/bound_state%s.xtc' % (dirs[name], int(map[i])))
+                #if not os.path.exists('%s/bound_state%s.xtc' % (dirs[name], int(map[i]))):
+                #    t=proj.get_random_confs_from_states(ass['arr_0'], [map[i],], 100)
+                #    print "writing bound state %s xtc" % map[i]
+                #    t[0].save_to_xtc('%s/bound_state%s.xtc' % (dirs[name], int(map[i])))
 
 def parse_commandline():
     parser = optparse.OptionParser()
     parser.add_option('-d', '--dir', dest='dir',
-                      help='directory')
-    parser.add_option('-g', '--gensfile', dest='gensfile',
-                          help='gens files')
-    parser.add_option('-w', action="store_true", dest="write")
+                      help='original cutoff directory')
+    parser.add_option('-c', '--coarse', dest='coarse',
+                      help='coarse grain cutoff')
+    parser.add_option('-r', '--rcut', dest='rcut',
+                      help='r cutoff for coarse')
+    parser.add_option('-l', '--lag', dest='lag',
+                      help='lag time')
     (options, args) = parser.parse_args()
     return (options, args)
 
 #run the function main if namespace is main
 if __name__ == "__main__":
     (options, args) = parse_commandline()
-    if options.write==True:
-        main(modeldir=options.dir, gensfile=options.gensfile,  write=True)
-    else:
-        main(modeldir=options.dir,gensfile=options.gensfile)
+    main(dir=options.dir, rcut=options.rcut, coarse=options.coarse, lag=options.lag)
 

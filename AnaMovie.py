@@ -76,11 +76,11 @@ def main(file):
     data=dict()
     data['selfrmsd']=numpy.loadtxt('%s.selfrmsd.dat' % file.split('.xtc')[0])
     #data['selfhelix']=numpy.loadtxt('%s.selfhelixrmsd.dat' % file.split('.xtc')[0])
-    #data['helix']=numpy.loadtxt('%s.helixrmsd.dat' % file.split('.xtc')[0])
+    data['helix']=numpy.loadtxt('%s.helixrmsd.dat' % file.split('.xtc')[0])
     #data['rmsd']=numpy.loadtxt('%s.rmsd.dat' % file.split('.xtc')[0])
-    com=numpy.loadtxt('%s.vmd_com.dat' % file.split('.xtc')[0], usecols=(1,))
-    com=[i/com[0] for i in com]
-    data['com']=com[1:]
+    #com=numpy.loadtxt('%s.vmd_com.dat' % file.split('.xtc')[0], usecols=(1,))
+    #com=[i/com[0] for i in com]
+    #data['com']=com[1:]
 
     residues=numpy.loadtxt('%s.ss.dat' % file.split('.xtc')[0], usecols=(0,), dtype=int)
     frames=numpy.loadtxt('%s.ss.dat' % file.split('.xtc')[0], usecols=(1,), dtype=int)
@@ -126,16 +126,16 @@ def main(file):
 
     count=0
     colors=[]
-    for n in range(0, len(data['com'])):
-        colors.append(count/(len(data['com'])/20.0))
+    for n in range(0, len(data['helix'])):
+        colors.append(count/(len(data['helix'])/20.0))
         if n % 20 ==0:
             count+=1
     for op in data.keys():
-        if op=='com':
+        if op=='helix':
             continue
         else:
             pylab.figure()
-            pylab.scatter(data['com'], data[op], c=colors, alpha=0.4)
+            pylab.scatter(data['helix'], data[op], c=colors, alpha=0.4)
             pylab.subplots_adjust(left = 0.1, right = 1.02, bottom = 0.10, top = 0.85, wspace = 0, hspace = 0)
             CB=pylab.colorbar()
             #l,b,w,h=pylab.gca().get_position().bounds
@@ -151,9 +151,10 @@ def main(file):
             if 'micro' in file:
                 pylab.title('%s $\mu$s' % file.split('_')[-1].split('.xtc')[0])
             elif 'path' in file:
+                dir=os.path.dirname(file)
                 pylab.title('%s' % file.split('_sample')[0])
-                paths=io.loadh('Paths.h5')
-                map=numpy.loadtxt('../Mapping.dat')
+                paths=io.loadh('%s/Paths.h5' % dir)
+                map=numpy.loadtxt('%s/Mapping.dat' % dir.split('tpt')[0])
                 p=file.split('path')[1].split('_sample')[0]
                 frames=numpy.where(paths['Paths'][int(p)]!=-1)[0]
                 gen_path=[]
@@ -163,7 +164,7 @@ def main(file):
                 print paths['fluxes'][int(p)]/paths['fluxes'][0]
             else:
                 pylab.title('%s' % file.split('.xtc')[0])
-        pylab.savefig('%s_%s_com.png' % (file.split('.xtc')[0], op), dpi=300)
+        pylab.savefig('%s_%s_helix.png' % (file.split('.xtc')[0], op), dpi=300)
     pylab.show()
 
 def parse_commandline():

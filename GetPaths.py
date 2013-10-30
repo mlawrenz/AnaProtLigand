@@ -42,19 +42,26 @@ def build_metric(dir, pdb, traj):
     data=dict()
     ligand_inds = numpy.loadtxt('%s/AtomIndices-ligand.dat' % dir, dtype=int)
     data['rmsd']=check_rmsd(dir, pdb, ligand_inds, traj)
-    ligand_inds = numpy.loadtxt('/nobackup/mlawrenz/FKBP-FAH-results2/loop2.dat', dtype='int')
-    data['loop2']=check_rmsd(dir, pdb, ligand_inds, traj)
-    ligand_inds = numpy.loadtxt('/nobackup/mlawrenz/FKBP-FAH-results2/loop3.dat', dtype='int')
-    data['loop3']=check_rmsd(dir, pdb, ligand_inds, traj)
-    index1=numpy.zeros((1,4)) # here i just need to tell _dihedralcalc that we have one set of 4 coordinates
-    index1[0]=numpy.loadtxt('%s/omega_indices.txt' % dir, dtype=int, ndmin=1)
-    data['omega']=get_dihedrals(dir, index1, traj)
-    index2=numpy.zeros((1,4)) # here i just need to tell _dihedralcalc that we have one set of 4 coordinates
-    index2[0]=numpy.loadtxt('%s/phi_indices.txt' % dir, dtype=int, ndmin=1)
-    data['phi']=get_dihedrals(dir, index2, traj)
-    pairs=check_metric_pairs(dir, traj)
-    for key in pairs.keys():
-        data[key]=[i*10 for i in pairs[key]]
+    ligand_inds = numpy.loadtxt('%s/sir2_beta_indices.dat' % dir, dtype=int)
+    data['helixrmsd']=check_rmsd(dir, pdb, ligand_inds, traj)
+    #ligand_inds = numpy.loadtxt('/nobackup/mlawrenz/FKBP-FAH-results2/loop2.dat', dtype='int')
+    #data['loop2']=check_rmsd(dir, pdb, ligand_inds, traj)
+    #ligand_inds = numpy.loadtxt('/nobackup/mlawrenz/FKBP-FAH-results2/loop3.dat', dtype='int')
+    #data['loop3']=check_rmsd(dir, pdb, ligand_inds, traj)
+    #index1=numpy.zeros((1,4)) # here i just need to tell _dihedralcalc that we have one set of 4 coordinates
+    #index1[0]=numpy.loadtxt('%s/omega_indices.txt' % dir, dtype=int, ndmin=1)
+    #data['omega']=get_dihedrals(dir, index1, traj)
+    #index2=numpy.zeros((1,4)) # here i just need to tell _dihedralcalc that we have one set of 4 coordinates
+    #index2[0]=numpy.loadtxt('%s/phi_indices.txt' % dir, dtype=int, ndmin=1)
+    #data['phi']=get_dihedrals(dir, index2, traj)
+    #pairs=check_metric_pairs(dir, traj)
+    #for key in pairs.keys():
+    #    data[key]=[i*10 for i in pairs[key]]
+    index=numpy.zeros((1,2)) 
+    index[0][0]=ligand_inds[0]
+    index[0][1]=ligand_inds[-1]
+    pairmetric= metrics.AtomPairs(metric='euclidean', p=1, atom_pairs=index)
+    data['ends']=[i*10 for i in pairmetric.prepare_trajectory(traj)]
     return data
 
 def map_size(x):
@@ -76,13 +83,13 @@ def main(modeldir, genfile,  type, write=False):
     map=numpy.loadtxt('%s/Mapping.dat' % modeldir)
     frames=numpy.where(map!=-1)[0]
 
-    unbound=numpy.loadtxt('%s/tpt-rmsd-%s/unbound_%s_states.txt' % (modeldir, type, type), dtype=int)
-    bound=numpy.loadtxt('%s/tpt-rmsd-%s/bound_%s_states.txt' % (modeldir, type, type), dtype=int)
+    unbound=numpy.loadtxt('%s/tpt-%s/unbound_%s_states.txt' % (modeldir, type, type), dtype=int)
+    bound=numpy.loadtxt('%s/tpt-%s/bound_%s_states.txt' % (modeldir, type, type), dtype=int)
 
-    dir=modeldir.split('Data')[0]
-    name=glob.glob('%s/fkbp*xtal*pdb' % dir)
+    dir=modeldir.split('/')[0]
+    name=glob.glob('%s/*xtal*pdb' % modeldir)
     pdb=Trajectory.load_from_pdb(name[0])
-    paths=io.loadh('%s/tpt-rmsd-%s/Paths.h5' % (modeldir, type))
+    paths=io.loadh('%s/tpt-%s/Paths.h5' % (modeldir, type))
 
     committors=numpy.loadtxt('%s/commitor_states.txt' % modeldir, dtype=int)
     colors=['red', 'orange', 'green', 'cyan', 'blue', 'purple']
@@ -95,8 +102,7 @@ def main(modeldir, genfile,  type, write=False):
         ref=10
     elif type=='loose':
         ref=15
-    #for p in range(0, 3):
-    for p in range(0, 1):
+    for p in range(0, 3):
         path=paths['Paths'][p]
         print "Bottleneck", paths['Bottlenecks'][p]
         flux=paths['fluxes'][p]/paths['fluxes'][0]
@@ -108,22 +114,28 @@ def main(modeldir, genfile,  type, write=False):
         print path
         if write==True:
             size=(paths['fluxes'][p]/paths['fluxes'][0])*1000
-            traj=Trajectory.load_from_xtc('%s/tpt-rmsd-%s/path%s_sample20.xtc' % (modeldir, type, p), Conf=pdb)
+            traj=Trajectory.load_from_xtc('%s/tpt-%s/path%s_sample20.xtc' % (modeldir, type, p), Conf=pdb)
             data=build_metric(dir, pdb, traj)
-            dir=modeldir.split('Data')[0]
             for op in sorted(data.keys()):
-            #for op in residues:
+                if op=='helixrmsd':
+                    continue
                 pylab.figure()
-                pylab.scatter(data['rmsd'], data[op], c=colors[p], alpha=0.7) #, s=size)
+                colorlist=[]
+                c=-1
+                for (n, state) in enumerate(data['rmsd']):
+                    if n % 20==0:
+                        c+=1
+                    colorlist.append(colors[c])
+                pylab.scatter(data['helixrmsd'], data[op], c=colorlist, alpha=0.7) #, s=size)
                 for j in paths['Bottlenecks'][p]:
                     frame=numpy.where(paths['Paths'][p]==j)[0]
-                    pylab.scatter(data['rmsd'][frame*20], data[op][frame*20], marker='x', c='k', alpha=0.7, s=50)
+                    pylab.scatter(data['helixrmsd'][frame*20], data[op][frame*20], marker='x', c='k', alpha=0.7, s=100)
                     location=numpy.where(committors==paths['Paths'][p][frame])[0]
                     if location.size:
                         print "path %s state %s bottleneck in committors" % (p, j)
-                        print data['rmsd'][frame*20], data[op][frame*20]
+                        print data['helixrmsd'][frame*20], data[op][frame*20]
                 pylab.title('path %s' % p)
-                pylab.xlabel('P-L RMSD')
+                pylab.xlabel('p53 Beta Sheet RMSD')
                 #pylab.xlabel('P-L COM')
                 pylab.ylabel(op)
                 pylab.xlim(0,max(data['rmsd'])+5)
