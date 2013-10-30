@@ -35,9 +35,9 @@ def main(dir, rcut,  coarse , lag):
 
     dirs=dict()
 
-    unbinds=[unbound_touch, unbound_touch, unbound_far_touch]
-    binds=[bound1, bound2, bound1]
-    names=['strict', 'medium' , 'far']
+    unbinds=[unbound_touch, unbound_far_touch]
+    binds=[bound1,  bound1]
+    names=['helix-touch' , 'helix-touch-far']
     for (u, b, name) in zip(unbinds, binds, names):
         dirs[name]='%s/msml%s_coarse_r%s_d%s/tpt-%s' % (dir, lag, rcut, coarse, name)
         if not os.path.exists(dirs[name]):

@@ -87,7 +87,7 @@ def main(modeldir, genfile,  type, write=False):
     bound=numpy.loadtxt('%s/tpt-%s/bound_%s_states.txt' % (modeldir, type, type), dtype=int)
 
     dir=modeldir.split('/')[0]
-    name=glob.glob('%s/*xtal*pdb' % modeldir)
+    name=glob.glob('%s/*xtal*pdb' % dir)
     pdb=Trajectory.load_from_pdb(name[0])
     paths=io.loadh('%s/tpt-%s/Paths.h5' % (modeldir, type))
 

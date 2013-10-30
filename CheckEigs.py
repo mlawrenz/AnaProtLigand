@@ -51,46 +51,53 @@ def main(modeldir, gensfile, write=False):
     if not os.path.exists('%s/eig-states/' % modeldir):
         os.mkdir('%s/eig-states/' % modeldir)
     ohandle=open('%s/eig-states/eiginfo.txt' % modeldir, 'w')
-    project=Project.load_from('%s/ProjectInfo.yaml' % modeldir.split('Data')[0])
+    project=Project.load_from('../sirtuin_round1/ProjectInfo.yaml')
     ass=io.loadh('%s/Assignments.Fixed.h5' % modeldir)
 
-    gens=Trajectory.load_from_lhdf(gensfile)
+    pdb=Trajectory.load_from_pdb('sir2_bound_xtal.pdb')
+    gens=Trajectory.load_from_xtc(gensfile, Conf=pdb)
     T=mmread('%s/tProb.mtx' % modeldir)
     data=dict()
-    data['rmsd']=numpy.loadtxt('%s.rmsd.dat' % gensfile.split('.lh5')[0])
-    com=numpy.loadtxt('%s.vmd_com.dat' % gensfile.split('.lh5')[0], usecols=(1,))
+    data['rmsd']=numpy.loadtxt('%s.rmsd.dat' % gensfile.split('.xtc')[0])
+    com=numpy.loadtxt('%s.vmd_com.dat' % gensfile.split('.xtc')[0], usecols=(1,))
+    data['helixrmsd']=numpy.loadtxt('%s.helixrmsd.dat' % gensfile.split('.xtc')[0])
+    com=numpy.loadtxt('%s.vmd_com.dat' % gensfile.split('.xtc')[0], usecols=(1,))
     data['com']=com[1:]
     pops=numpy.loadtxt('%s/Populations.dat' % modeldir)
     map=numpy.loadtxt('%s/Mapping.dat' % modeldir)
 
     map_rmsd=[]
+    map_helixrmsd=[]
     map_com=[]
     for x in range(0, len(data['rmsd'])):
         if map[x]!=-1:
             map_com.append(data['com'][x])
             map_rmsd.append(data['rmsd'][x])
+            map_helixrmsd.append(data['helixrmsd'][x])
     
     map_com=numpy.array(map_com)
     map_rmsd=numpy.array(map_rmsd)
+    map_helixrmsd=numpy.array(map_helixrmsd)
+
     T=mmread('%s/tProb.mtx' % modeldir)
     eigs_m=msm_analysis.get_eigenvectors(T, 10)
 
     cm=pylab.cm.get_cmap('RdYlBu_r') #blue will be negative components, red positive
 
     print numpy.shape(eigs_m[1][:,1])
-    for i in range(0,1):
+    for i in range(0,3):
         order=numpy.argsort(eigs_m[1][:,i])
         if i==0:
             maxes=[]
             gen_maxes=[]
             values=[]
             ohandle.write('eig%s maxes\n' % i)
-            ohandle.write('state\tgenstate\tmagnitude\trmsd\tcom\n')
+            ohandle.write('state\tgenstate\tmagnitude\thelixrmsd\tcom\n')
             for n in order[::-1][:5]:
                 gen_maxes.append(numpy.where(map==n)[0])
                 maxes.append(n)
                 values.append(eigs_m[1][n,i])
-                ohandle.write('%s\t%s\t%s\t%s\t%s\n' % (n, numpy.where(map==n)[0], eigs_m[1][n,i], map_rmsd[n], map_com[n]))
+                ohandle.write('%s\t%s\t%s\t%s\t%s\n' % (n, numpy.where(map==n)[0], eigs_m[1][n,i], map_helixrmsd[n], map_com[n]))
             print "maxes at ",  maxes, values
             maxes=numpy.array(maxes)
             if write==True:
@@ -104,7 +111,7 @@ def main(modeldir, gensfile, write=False):
                 gen_maxes.append(numpy.where(map==n)[0])
                 maxes.append(n)
                 values.append(eigs_m[1][n,i])
-                ohandle.write('%s\t%s\t%s\t%s\t%s\n' % (n, numpy.where(map==n)[0], eigs_m[1][n,i], map_rmsd[n], map_com[n]))
+                ohandle.write('%s\t%s\t%s\t%s\t%s\n' % (n, numpy.where(map==n)[0], eigs_m[1][n,i], map_helixrmsd[n], map_com[n]))
             print "maxes at ",  maxes, values
             order=numpy.argsort(eigs_m[1][:,i])
             mins=[]
@@ -115,12 +122,12 @@ def main(modeldir, gensfile, write=False):
                 gen_mins.append(numpy.where(map==n)[0])
                 mins.append(n)
                 values.append(eigs_m[1][n,i])
-                ohandle.write('%s\t%s\t%s\t%s\t%s\n' % (n, numpy.where(map==n)[0], eigs_m[1][n,i], map_rmsd[n], map_com[n]))
+                ohandle.write('%s\t%s\t%s\t%s\t%s\n' % (n, numpy.where(map==n)[0], eigs_m[1][n,i], map_helixrmsd[n], map_com[n]))
             print "mins at ",  mins, values
             if write==True:
                 get_structure(modeldir, i, gen_maxes,  maxes, gens, project, ass, type='max')
                 get_structure(modeldir, i, gen_mins,  mins, gens, project, ass, type='min')
-        pylab.scatter(map_com[order], map_rmsd[order], c=eigs_m[1][order,i], cmap=cm, s=1000*abs(eigs_m[1][order,i]), alpha=0.5)
+        pylab.scatter(map_helixrmsd[order], map_rmsd[order], c=eigs_m[1][order,i], cmap=cm, s=1000*abs(eigs_m[1][order,i]), alpha=0.5)
         print map_com[order][numpy.argmax(eigs_m[1][order,i])]
         print eigs_m[1][order,i][1]
         CB=pylab.colorbar()
@@ -129,10 +136,11 @@ def main(modeldir, gensfile, write=False):
         CB.ax.set_position([ll, b+0.1*h, ww, h*0.8])
         CB.set_label('Eig%s Magnitudes' % i)
         ylabel=pylab.ylabel('Ligand RMSD to Xtal ($\AA$)')
-        xlabel=pylab.xlabel(r'P Active Site - L COM Distance ($\AA$)')
+        xlabel=pylab.xlabel('Ligand Beta RMSD')
+        #xlabel=pylab.xlabel(r'P Active Site - L COM Distance ($\AA$)')
         pylab.legend(loc=8, frameon=False)
         pylab.savefig('%s/2deigs%i_com_prmsd.png' %(modeldir, i),dpi=300)
-        #pylab.show()
+        pylab.show()
 
 def parse_commandline():
     parser = optparse.OptionParser()
