@@ -62,6 +62,7 @@ def main(modeldir, gensfile, write=False):
     com=numpy.loadtxt('%s.vmd_com.dat' % gensfile.split('.xtc')[0], usecols=(1,))
     data['helixrmsd']=numpy.loadtxt('%s.helixrmsd.dat' % gensfile.split('.xtc')[0])
     com=numpy.loadtxt('%s.vmd_com.dat' % gensfile.split('.xtc')[0], usecols=(1,))
+    ref_com=com[0]
     data['com']=com[1:]
     pops=numpy.loadtxt('%s/Populations.dat' % modeldir)
     map=numpy.loadtxt('%s/Mapping.dat' % modeldir)
@@ -127,7 +128,8 @@ def main(modeldir, gensfile, write=False):
             if write==True:
                 get_structure(modeldir, i, gen_maxes,  maxes, gens, project, ass, type='max')
                 get_structure(modeldir, i, gen_mins,  mins, gens, project, ass, type='min')
-        pylab.scatter(map_helixrmsd[order], map_rmsd[order], c=eigs_m[1][order,i], cmap=cm, s=1000*abs(eigs_m[1][order,i]), alpha=0.5)
+        pylab.scatter(map_com[order], map_helixrmsd[order] , c=eigs_m[1][order,i], cmap=cm, s=1000*abs(eigs_m[1][order,i]), alpha=0.5)
+        pylab.plot([ref_com]*len(map_com), map_helixrmsd[order], 'r-')
         print map_com[order][numpy.argmax(eigs_m[1][order,i])]
         print eigs_m[1][order,i][1]
         CB=pylab.colorbar()
@@ -135,9 +137,9 @@ def main(modeldir, gensfile, write=False):
         ll, bb, ww, hh=CB.ax.get_position().bounds
         CB.ax.set_position([ll, b+0.1*h, ww, h*0.8])
         CB.set_label('Eig%s Magnitudes' % i)
-        ylabel=pylab.ylabel('Ligand RMSD to Xtal ($\AA$)')
-        xlabel=pylab.xlabel('Ligand Beta RMSD')
-        #xlabel=pylab.xlabel(r'P Active Site - L COM Distance ($\AA$)')
+        #ylabel=pylab.ylabel('Ligand RMSD to Xtal ($\AA$)')
+        ylabel=pylab.xlabel('Ligand Beta RMSD')
+        xlabel=pylab.xlabel(r'P Active Site - L COM Distance ($\AA$)')
         pylab.legend(loc=8, frameon=False)
         pylab.savefig('%s/2deigs%i_com_prmsd.png' %(modeldir, i),dpi=300)
         pylab.show()

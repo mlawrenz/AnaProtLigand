@@ -82,9 +82,9 @@ def main(file):
     #com=[i/com[0] for i in com]
     #data['com']=com[1:]
 
-    residues=numpy.loadtxt('%s.ss.dat' % file.split('.xtc')[0], usecols=(0,), dtype=int)
-    frames=numpy.loadtxt('%s.ss.dat' % file.split('.xtc')[0], usecols=(1,), dtype=int)
-    struct=numpy.loadtxt('%s.ss.dat' % file.split('.xtc')[0], usecols=(2,), dtype=str)
+    residues=numpy.loadtxt('%s.ss.dat' % file, usecols=(0,), dtype=int)
+    frames=numpy.loadtxt('%s.ss.dat' % file, usecols=(1,), dtype=int)
+    struct=numpy.loadtxt('%s.ss.dat' % file, usecols=(2,), dtype=str)
     ref_matrix, ss_matrix=get_ss_matrix(residues, frames, struct, stride=20)
     cm=pylab.cm.get_cmap('RdYlBu_r', 7)
     fig=pylab.figure(figsize=(8,8))
